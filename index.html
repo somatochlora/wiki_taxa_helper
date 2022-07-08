@@ -5,6 +5,36 @@
         <title>Wiki Taxa Helper</title>
     </head>
     <body>
-        Welcome again!
+        <p id = "intro">What taxa do you want to look up?</p>
+        <input type = "text" default = "iNat taxon number" id = "iNatTaxonID">
+        <button type = "button" id = "taxonSubmit">submit</button>
+        <div id = "results"></div>
+
+        <script>
+            const getJSON = async url => {
+                const response = await fetch(url);
+                if(!response.ok) // check if response worked (no 404 errors etc...)
+                    throw new Error(response.statusText);
+
+                const data = response.json(); // get JSON from the response
+                return data; // returns a promise, which resolves to this data value
+            }
+
+            document.querySelector('#taxonSubmit').addEventListener('click', function() {
+                let taxonID = document.querySelector('#iNatTaxonID').value;
+                let taxonData;
+                getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID).then(data => {
+                    results = document.querySelector('#results');
+                    for (let i = 0; i < data.results[0].children.length; i++) {
+                        let para = document.createElement('p');
+                        para.textContent = data.results[0].children[i].name;
+                        results.appendChild(para);
+                    }
+                }).catch(error => {
+                    alert(error);
+                });
+            });
+        </script>
+
     </body>
 </html>
