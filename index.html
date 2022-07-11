@@ -22,7 +22,6 @@
 
             document.querySelector('#taxonSubmit').addEventListener('click', function() {
                 let taxonID = document.querySelector('#iNatTaxonID').value;
-                let taxonData;
                 getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID).then(data => {
                     results = document.querySelector('#results');
                     for (let i = 0; i < data.results[0].children.length; i++) {
