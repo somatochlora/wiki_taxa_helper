@@ -1,0 +1,5 @@
+1. ask user for taxon from iNat:
+    - Enter id
+
+2. Retrieve list of child taxa and ids
+3. For each child taxa, retrieve any free photos
