@@ -48,23 +48,32 @@
                             let imagesDiv = document.createElement('div');
                             para.textContent = data.results[0].children[i].name + ": " + childData.total_results + " observations with licensed photos";
                             observationDiv.appendChild(para);
-                            for (let observationIndex = 0; observationIndex < childData.results.length; observationIndex++) {
-                                
-                                for (let imageIndex = 0; imageIndex < childData.results[observationIndex].photos.length; imageIndex++) {
-                                    let link = document.createElement('a')
-                                    link.href = "https://www.inaturalist.org/observations/" + childData.results[observationIndex].id;
-                                    let image = document.createElement('img');
-                                    // need to check license on each photo individually todo
-                                    image.src = childData.results[observationIndex].photos[imageIndex].url;
-                                    link.appendChild(image);
-                                    imagesDiv.appendChild(link);
-                                }
-                                observationDiv.appendChild(imagesDiv);
-                            }                            
+                            if (childData.total_results == 0) {
+                                alert("species = " + data.results[0].name);
+                            }
+                            if (childData.total_results != 0) {
+                                for (let observationIndex = 0; observationIndex < childData.results.length; observationIndex++) {
+                                    
+                                    for (let imageIndex = 0; imageIndex < childData.results[observationIndex].photos.length; imageIndex++) {
+                                        let link = document.createElement('a')
+                                        link.href = "https://www.inaturalist.org/observations/" + childData.results[observationIndex].id;
+                                        let image = document.createElement('img');
+                                        // need to check license on each photo individually todo
+                                        image.src = childData.results[observationIndex].photos[imageIndex].url;
+                                        link.appendChild(image);
+                                        imagesDiv.appendChild(link);
+                                    }
+                                    observationDiv.appendChild(imagesDiv);
+                                } 
+                            }                           
                             results.appendChild(observationDiv);
-                        }).catch(error => alert(error));                  
+                        }).catch(error => {
+                            alert("the problem is with the second request, number" + i);
+                            alert(error)
+                        });                  
                     }
                 }).catch(error => {
+                    alert("the problem is with the first request");
                     alert(error);
                 });
             });
