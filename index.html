@@ -20,14 +20,25 @@
                 return data; // returns a promise, which resolves to this data value
             }
 
+            async function getLicensedPhotos (taxonID) {
+                const response = await fetch("https://api.inaturalist.org/v1/observations?photo_license=cc-by%2Ccc-by-sa%2Ccc0&taxon_id=" + taxonID)
+                if(!response.ok)
+                    throw new Error(response.statusText);
+                const data = response.json();
+                return data;
+            } 
+
             document.querySelector('#taxonSubmit').addEventListener('click', function() {
                 let taxonID = document.querySelector('#iNatTaxonID').value;
                 getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID).then(data => {
                     results = document.querySelector('#results');
                     for (let i = 0; i < data.results[0].children.length; i++) {
-                        let para = document.createElement('p');
-                        para.textContent = data.results[0].children[i].name;
-                        results.appendChild(para);
+                        getLicensedPhotos(data.results[0].children[i].id).then(childData => {
+                            let para = document.createElement('p');
+                            para.textContent = data.results[0].children[i].name + ": " + childData.total_results + " observations with licensed photos";
+                            results.appendChild(para);
+                        }).catch(error => alert(error));                  
+                        
                     }
                 }).catch(error => {
                     alert(error);
