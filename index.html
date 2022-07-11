@@ -28,17 +28,29 @@
                 return data;
             } 
 
+
+
             document.querySelector('#taxonSubmit').addEventListener('click', function() {
                 let taxonID = document.querySelector('#iNatTaxonID').value;
                 getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID).then(data => {
                     results = document.querySelector('#results');
                     for (let i = 0; i < data.results[0].children.length; i++) {
                         getLicensedPhotos(data.results[0].children[i].id).then(childData => {
+                            let observationDiv = document.createElement('div');
                             let para = document.createElement('p');
+                            let imagesDiv = document.createElement('div');
                             para.textContent = data.results[0].children[i].name + ": " + childData.total_results + " observations with licensed photos";
-                            results.appendChild(para);
+                            for (let imageIndex = 0; imageIndex < childData.results.length; imageIndex++) {
+                                let image = document.createElement('img');
+                                // currently only gets first photo todo
+                                // need to check license on each photo individually todo
+                                image.src = childData.results[imageIndex].photos[0].url;
+                                imagesDiv.appendChild(image);
+                            }
+                            observationDiv.appendChild(para);
+                            observationDiv.appendChild(imagesDiv);
+                            results.appendChild(observationDiv);
                         }).catch(error => alert(error));                  
-                        
                     }
                 }).catch(error => {
                     alert(error);
