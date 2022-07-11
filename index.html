@@ -41,11 +41,14 @@
                             let imagesDiv = document.createElement('div');
                             para.textContent = data.results[0].children[i].name + ": " + childData.total_results + " observations with licensed photos";
                             for (let imageIndex = 0; imageIndex < childData.results.length; imageIndex++) {
+                                let link = document.createElement('a')
+                                link.href = "https://www.inaturalist.org/observations/" + childData.results[imageIndex].id;
                                 let image = document.createElement('img');
                                 // currently only gets first photo todo
                                 // need to check license on each photo individually todo
                                 image.src = childData.results[imageIndex].photos[0].url;
-                                imagesDiv.appendChild(image);
+                                link.appendChild(image);
+                                imagesDiv.appendChild(link);
                             }
                             observationDiv.appendChild(para);
                             observationDiv.appendChild(imagesDiv);
