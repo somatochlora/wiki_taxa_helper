@@ -11,6 +11,8 @@
         <div id = "results"></div>
 
         <script>
+            "use strict";
+
             const getJSON = async url => {
                 const response = await fetch(url);
                 if(!response.ok) // check if response worked (no 404 errors etc...)
@@ -28,6 +30,46 @@
                 return data;
             } 
 
+            class Taxon {
+                constructor(taxonData) {
+                    this.latinName = taxonData.name;
+                    this.rank = taxonData.rank;
+                    this.children = taxonData.children;
+                    this.hasChildren = this.children != null;
+                    if (this.hasChildren) this.childrenNum = this.children.length;
+                    this.commonName = taxonData.preferred_common_name;
+                    this.hasCommonName = this.commonName != null;
+                }
+
+                addObservations(observationData) {
+                    this.observations = [];
+                    for (let observation in observationData) {
+                        let newObs = {};
+                        newObs.qualityGrade = observation.quality_grade;
+                        newObs.datetime = observation.time_observed_at;
+                        newObs.id = observation.id;
+                        newObs.geoprivacy = observation.geoprivacy;
+                        if (newObs.geoprivacy = null) newObs.geoprivacy = "open";
+                        newObs.photos = observation.photos;
+                        newObs.location = observation.location;
+
+                        this.observations.push(newObs);
+                    }
+                    this.observations = observationData;
+                }
+
+                getLicensedPhotos () {
+                    pass;
+                }
+
+                getWikidataID () {
+                    pass;
+                }
+
+
+
+            }
+
             /*async function getWikiDataTaxon (taxonID) {
                 const sparqlQuery = 'SELECT ?item\nWHERE\n{\n?item wdt:P3151 "' + taxonID + '".\n}';
                 const response = await fetch('https://query.wikidata.org/sparql?query=' + encodeURIComponent(sparqlQuery))
@@ -37,23 +79,23 @@
                 return data;
             }*/
 
+            let taxa = [];
+
             document.querySelector('#taxonSubmit').addEventListener('click', function() {
                 let taxonID = document.querySelector('#iNatTaxonID').value;
                 getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID).then(data => {
-                    results = document.querySelector('#results');
+                    let results = document.querySelector('#results');
                     
-                    // to keep api requests reaonsable cap number of child api calls at 20. TODO: add pagination to get all children
-                    childTaxaNum = data.results[0].children.length;
-                    if (childTaxaNum > 20) {
-                        childTaxaNum = 20;
-                    }
+                    let parentTaxon = new Taxon (data.results[0]);
 
-                    for (let i = 0; i < childTaxaNum; i++) {
-                        getLicensedPhotos(data.results[0].children[i].id).then(childData => {
+                    // TODO: add pagination to get all children
+
+                    for (let i = 0; i < parentTaxon.childrenNum; i++) {
+                        getLicensedPhotos(parentTaxon.children[i].id).then(childData => {
                             let observationDiv = document.createElement('div');
                             let para = document.createElement('p');
                             let imagesDiv = document.createElement('div');
-                            para.textContent = data.results[0].children[i].name + ": " + childData.total_results + " observations with licensed photos";
+                            para.textContent = parentTaxon.children[i].name + ": " + childData.total_results + " observations with licensed photos";
                             observationDiv.appendChild(para);
                             if (childData.total_results != 0) {
                                 for (let observationIndex = 0; observationIndex < childData.results.length; observationIndex++) {
