@@ -22,10 +22,6 @@
                 return data; // returns a promise, which resolves to this data value
             }
 
-            async function getLicensedPhotos (taxonID) {
-                c
-            } 
-
             class Taxon {
                 constructor(taxonData) {
                     this.id = taxonData.id;
@@ -98,20 +94,38 @@
                             let observationDiv = document.createElement('div');
                             let para = document.createElement('p');
                             let imagesDiv = document.createElement('div');
+
                             taxa[childIndex].addObservations(childData.results);
+
                             para.textContent = taxa[childIndex].commonName + ": " + childData.total_results + " observations with licensed photos";
                             observationDiv.appendChild(para);
+
                             if (childData.total_results != 0) {
-                                for (let observationIndex = 0; observationIndex < taxa[childIndex].observations.length; observationIndex++) {
-                                    
+                                for (let observationIndex = 0; observationIndex < taxa[childIndex].observations.length; observationIndex++) {                                    
                                     for (let imageIndex = 0; imageIndex < taxa[childIndex].observations[observationIndex].photoNum; imageIndex++) {
+                                        
                                         let link = document.createElement('a');
                                         link.target = "_blank";
                                         link.href = "https://www.inaturalist.org/observations/" + taxa[childIndex].observations[observationIndex].id;
                                         link.id = childIndex + "," + observationIndex + "," + imageIndex;
+
                                         let image = document.createElement('img');
                                         // need to check license on each photo individually todo
                                         image.src = taxa[childIndex].observations[observationIndex].photos[imageIndex].url;
+                                        let borderColour;
+                                        switch (taxa[childIndex].observations[observationIndex].qualityGrade) {
+                                            case "research": 
+                                                borderColour = "green";
+                                                break;
+                                            case "needs_id":
+                                                borderColour = "yellow";
+                                                break;
+                                            case "casual":
+                                                borderColour = "red";
+                                                break;
+                                        }
+                                        image.style = "border:4px solid " + borderColour + ";";
+
                                         link.appendChild(image);
                                         imagesDiv.appendChild(link);
                                     }
