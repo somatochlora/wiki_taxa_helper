@@ -1,13 +1,21 @@
 "use strict";
 
-const getJSON = async url => {
+// Number of cild taxa to get at one time
+const childSetNum = 10;
+
+// Number of photos to display at a time
+const photoDisplayNum = 20;
+
+async function getJSON(url) {
     const response = await fetch(url);
-    if(!response.ok) // check if response worked (no 404 errors etc...)
+    if (!response.ok) // check if response worked (no 404 errors etc...)
         throw new Error(response.statusText);
 
     const data = response.json(); // get JSON from the response
     return data; // returns a promise, which resolves to this data value
 }
+
+
 
 class Taxon {
     constructor(taxonData) {
@@ -40,27 +48,22 @@ class Taxon {
 
     async getLicensedPhotos () {
         const response = await fetch("https://api.inaturalist.org/v1/observations?photo_license=cc-by%2Ccc-by-sa%2Ccc0&taxon_id=" + this.id)
-        if(!response.ok)
-            throw new Error(response.statusText);
         const data = response.json();
         return data;
     }
 
-    getWikidataID () {
-        pass;
+    async getWikidataID () {
+        const sparqlQuery = `SELECT ?item
+WHERE
+{
+?item wdt:P3151 "` + this.id + `".
+}`;
+        const response = await fetch('https://query.wikidata.org/sparql?query=' + encodeURIComponent(sparqlQuery) + '&format=json');
+        if(!response.ok) throw new Error(response.statusText);
+        const data = await response.json();
+        this.wikidataID = data.results.bindings[0].item.value;
     }
 }
-
-/*async function getWikiDataTaxon (taxonID) {
-    const sparqlQuery = 'SELECT ?item\nWHERE\n{\n?item wdt:P3151 "' + taxonID + '".\n}';
-    const response = await fetch('https://query.wikidata.org/sparql?query=' + encodeURIComponent(sparqlQuery))
-    if(!response.ok)
-        throw new Error(response.statusText);
-    const data = response.text();
-    return data;
-}*/
-
-
 
 document.querySelector('#taxonSubmit').addEventListener('click', function() {
     let taxonID = document.querySelector('#iNatTaxonID').value;
@@ -74,14 +77,17 @@ document.querySelector('#taxonSubmit').addEventListener('click', function() {
         for (let childIndex = 0; childIndex < parentTaxon.childrenNum; childIndex++) {
             taxa.push(new Taxon (parentTaxon.children[childIndex]));
             taxa[childIndex].getLicensedPhotos().then(childData => {
-                
+                taxa[childIndex].getWikidataID()
+                .then()
+                .catch(error => alert("Wikidata API call error: " + error));
                 let observationDiv = document.createElement('div');
                 let para = document.createElement('p');
                 let imagesDiv = document.createElement('div');
 
                 taxa[childIndex].addObservations(childData.results);
-
-                para.textContent = taxa[childIndex].commonName + ": " + childData.total_results + " observations with licensed photos";
+                if (taxa[childIndex].hasCommonName) para.textContent = taxa[childIndex].commonName;
+                else para.textContent = taxa[childIndex].latinName;
+                para.textContent += ": " + childData.total_results + " observations with licensed photos";
                 observationDiv.appendChild(para);
 
                 if (childData.total_results != 0) {
