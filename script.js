@@ -5,6 +5,8 @@ const PHOTODISPLAYNUM = 20;
 
 let children = {};
 let parentTaxon;
+let childIds = [];
+let curChildNum;
 
 const iNatPhotosDiv = document.querySelector('#inat-photos');
 const prevChildButton = document.querySelector('#prev-child');
@@ -89,6 +91,9 @@ class Taxon {
         
         // this is NOT the same as the length of this.observations, as that only returns the number of observations in the current json request
         this.observationCount = observationData.total_results;
+
+        // there is no way to get the numbers of licensed *photos* without making an arbitraryly large number of api requests
+
         if (this.observationCount == 0) return;
         for (let observation of observationData.results) {
             let newObs = {};
@@ -148,6 +153,38 @@ WHERE
     }
 }
 
+async function displayChild() {
+    let curChild;
+    if (curChildNum == childIds.length) {
+        curChild = new Taxon(parentTaxon.children[curChildNum]);
+        childIds.push(curChild.id);
+        children[childIds[curChildNum]] = curChild;
+
+        await curChild.loadChild()
+    } else {
+        curChild = children[childIds[curChildNum]];
+    }
+
+    let para = document.createElement('p');
+
+    if (curChild.hasCommonName) para.textContent = curChild.commonName;
+    else para.textContent = curChild.latinName;
+    para.textContent += ": " + curChild.observationCount + " observations with licensed photos";
+
+    iNatPhotosDiv.innerHTML = "";
+    iNatPhotosDiv.appendChild(para);
+    iNatPhotosDiv.appendChild(curChild.makePhotos());
+
+    if (curChildNum == parentTaxon.children.length - 1) 
+        nextChildButton.disabled = true
+    else 
+        nextChildButton.disabled = false;
+    if (curChildNum == 0) 
+        prevChildButton.disabled = true
+    else    
+        prevChildButton.disabled = false;
+}
+
 document.querySelector('#taxonSubmit').addEventListener('click', function() {
     let taxonID = document.querySelector('#iNatTaxonID').value;
     getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID)
@@ -155,32 +192,30 @@ document.querySelector('#taxonSubmit').addEventListener('click', function() {
         
         parentTaxon = new Taxon (data.results[0]);
 
-        let curChild = new Taxon(parentTaxon.children[0]);
-        children[curChild.id] = curChild;
-        
-        curChild.loadChild()
-        .then(() => {
-            let para = document.createElement('p');
-
-            if (curChild.hasCommonName) para.textContent = curChild.commonName;
-            else para.textContent = curChild.latinName;
-            para.textContent += ": " + curChild.observationCount + " observations with licensed photos";
-
-            iNatPhotosDiv.appendChild(para);
-            iNatPhotosDiv.appendChild(curChild.makePhotos());
-
-            prevChildButton.disabled = false;
-            nextChildButton.disabled = false;
-            prevPhotosButton.disabled = false;
-            nextPhotosButton.disabled = false;
-
-        })
+        curChildNum = 0;
+        displayChild()     
         .catch(error => {
             alert("child api call error: " + error);
         });
     })
     .catch(error => {
         alert("parent api call error: " + error);
+    });
+});
+
+nextChildButton.addEventListener('click', function() {
+    curChildNum += 1;
+    displayChild()
+    .catch(error => {
+        alert("child api call error: " + error);
+    });
+});
+
+prevChildButton.addEventListener('click', function() {
+    curChildNum -= 1;
+    displayChild()
+    .catch(error => {
+        alert("child api call error: " + error);
     });
 });
 
