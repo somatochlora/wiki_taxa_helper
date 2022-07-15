@@ -85,6 +85,8 @@ class Taxon {
         this.hasCommonName = (this.commonName != undefined);
         this.observations = [];
         this.photos = [];
+        if (this.hasCommonName) this.name = this.commonName;
+        else this.name = this.latinName;
     }
 
     addObservations(observationData) {        
@@ -167,22 +169,26 @@ async function displayChild() {
 
     let para = document.createElement('p');
 
-    if (curChild.hasCommonName) para.textContent = curChild.commonName;
-    else para.textContent = curChild.latinName;
-    para.textContent += ": " + curChild.observationCount + " observations with licensed photos";
+    para.textContent = curChild.name + ": " + curChild.observationCount + " observations with licensed photos";
 
     iNatPhotosDiv.innerHTML = "";
     iNatPhotosDiv.appendChild(para);
     iNatPhotosDiv.appendChild(curChild.makePhotos());
 
-    if (curChildNum == parentTaxon.children.length - 1) 
-        nextChildButton.disabled = true
-    else 
+    if (curChildNum == parentTaxon.children.length - 1) {
+        nextChildButton.disabled = true;
+        nextChildButton.innerHTML = "last taxon";
+    } else {
         nextChildButton.disabled = false;
-    if (curChildNum == 0) 
-        prevChildButton.disabled = true
-    else    
+        nextChildButton.innerHTML = parentTaxon.children[curChildNum + 1].name + "  -->";
+    }
+    if (curChildNum == 0) {
+        prevChildButton.disabled = true;
+        prevChildButton.innerHTML = "first taxon";
+    } else {   
         prevChildButton.disabled = false;
+        prevChildButton.innerHTML = "<--  " + parentTaxon.children[curChildNum - 1].name;
+    }
 }
 
 document.querySelector('#taxonSubmit').addEventListener('click', function() {
