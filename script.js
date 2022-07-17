@@ -8,6 +8,7 @@ let parentTaxon;
 let childIds = [];
 let curChildNum;
 
+
 const iNatPhotosDiv = document.querySelector('#inat-photos');
 const prevChildButton = document.querySelector('#prev-child');
 const nextChildButton = document.querySelector('#next-child');
@@ -85,15 +86,19 @@ class Taxon {
         this.hasCommonName = (this.commonName != undefined);
         this.observations = [];
         this.photos = [];
+        this.photoPos = 0;
+        this.curMaxId = -1;
         if (this.hasCommonName) this.name = this.commonName;
         else this.name = this.latinName;
+        this.loaded = false;
     }
 
     addObservations(observationData) {        
         
         // this is NOT the same as the length of this.observations, as that only returns the number of observations in the current json request
-        this.observationCount = observationData.total_results;
-
+        if (this.photos.length == 0) {
+            this.observationCount = observationData.total_results;
+        }        
         // there is no way to get the numbers of licensed *photos* without making an arbitraryly large number of api requests
 
         if (this.observationCount == 0) return;
@@ -112,6 +117,8 @@ class Taxon {
 
             this.observations.push(newObs);
         };
+
+        this.curMaxId = this.observations[this.observations.length - 1].id;
     }
 
     async getLicensedPhotos (maxId = -1) {
@@ -135,24 +142,43 @@ WHERE
     }
     
     async loadChild () {
+        if (this.loaded) return;
         let observationsData = await this.getLicensedPhotos()
         this.addObservations(observationsData)
+        if (this.photos.length < PHOTODISPLAYNUM * 2) {
+            await this.loadMorePhotos();
+        }
         await this.getWikidataId();
+        this.loaded = true;
     }
 
-    async getMorePhotos (maxId) {
-        let observationsData = await this.getLicensedPhotos(maxId)
-        this.addObservations(observationsData)
+    async loadMorePhotos () {
+        let observationsData = await this.getLicensedPhotos(this.curMaxId)
+        this.addObservations(observationsData)        
     }
 
-    makePhotos (start = 0) {
+    makePhotos () {
         let photosDiv = document.createElement('div');
-        for (let i = start; i < start + PHOTODISPLAYNUM; i++) {
+        for (let i = this.photoPos; i < this.photoPos + PHOTODISPLAYNUM; i++) {
             if (i == this.photos.length) break;
             photosDiv.appendChild(this.photos[i].returnDiv());
         }
         return photosDiv;
     }
+
+    async nextPhotos () {
+        this.photoPos += PHOTODISPLAYNUM;
+        if (this.photos.length + this.photoPos < PHOTODISPLAYNUM * 2) {
+            await this.loadMorePhotos();
+        }
+        return this.makePhotos();
+    }
+
+    prevPhotos () {
+        this.photoPos -= PHOTODISPLAYNUM;
+        return this.makePhotos();
+    }
+
 }
 
 async function displayChild() {
@@ -189,6 +215,10 @@ async function displayChild() {
         prevChildButton.disabled = false;
         prevChildButton.innerHTML = "<--  " + parentTaxon.children[curChildNum - 1].name;
     }
+
+    prevPhotosButton.disabled = false;
+    nextPhotosButton.disabled = false;
+
 }
 
 document.querySelector('#taxonSubmit').addEventListener('click', function() {
@@ -225,4 +255,14 @@ prevChildButton.addEventListener('click', function() {
     });
 });
 
+nextPhotosButton.addEventListener('click', async function() {
+    iNatPhotosDiv.innerHTML = "";
+    iNatPhotosDiv.appendChild(await children[childIds[curChildNum]].nextPhotos());
+
+});
+
+prevPhotosButton.addEventListener('click', async function() {
+    iNatPhotosDiv.innerHTML = "";
+    iNatPhotosDiv.appendChild(children[childIds[curChildNum]].prevPhotos());
+});
 
