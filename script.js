@@ -193,14 +193,14 @@ WHERE
 
 }
 
-async function loadNextChild() {
-    if (curChildNum == childIds.length) {
+async function loadNextChild(override = false) {
+    if (curChildNum == childIds.length - 1 || override) {
         let curChild = new Taxon(parentTaxon.children[curChildNum + 1]);
         childIds.push(curChild.id);
         children[childIds[curChildNum + 1]] = curChild;
-
         await curChild.loadPhotos()
     }
+    return true;
 }
 
 async function displayChild() {
@@ -251,17 +251,21 @@ async function displayChild() {
 
 }
 
-document.querySelector('#taxonSubmit').addEventListener('click', function() {
+document.querySelector('#taxonSubmit').addEventListener('click', async function() {
     let taxonID = document.querySelector('#iNatTaxonID').value;
     getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID)
-    .then(data => {        
+    .then(async (data) => {        
         
         parentTaxon = new Taxon (data.results[0]);
+
+        curChildNum = -1;
+
+        await loadNextChild(true);
 
         curChildNum = 0;
         displayChild()     
         .catch(error => {
-            alert("child api call error: " + error);
+            alert("display child error: " + error);
         });
     })
     .catch(error => {
@@ -274,6 +278,7 @@ nextChildButton.addEventListener('click', async function() {
     prevPhotosButton.disabled = true;
     await nextChildPromise;
     curChildNum += 1;
+    nextChildPromise = loadNextChild();
     displayChild()
     .catch(error => {
         alert("child api call error: " + error);
