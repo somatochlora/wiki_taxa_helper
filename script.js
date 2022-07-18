@@ -1,13 +1,14 @@
 "use strict";
 
 // Number of photos to display at a time
+// This will also be the number of observations retrieved at one time
 const PHOTODISPLAYNUM = 20;
 
 let children = {};
 let parentTaxon;
 let childIds = [];
 let curChildNum;
-
+let nextChildPromise;
 
 const iNatPhotosDiv = document.querySelector('#inat-photos');
 const prevChildButton = document.querySelector('#prev-child');
@@ -192,6 +193,16 @@ WHERE
 
 }
 
+async function loadNextChild() {
+    if (curChildNum == childIds.length) {
+        let curChild = new Taxon(parentTaxon.children[curChildNum + 1]);
+        childIds.push(curChild.id);
+        children[childIds[curChildNum + 1]] = curChild;
+
+        await curChild.loadPhotos()
+    }
+}
+
 async function displayChild() {
     let curChild;
     if (curChildNum == childIds.length) {
@@ -203,6 +214,8 @@ async function displayChild() {
     } else {
         curChild = children[childIds[curChildNum]];
     }
+
+    nextChildPromise = loadNextChild();
 
     let para = document.createElement('p');
 
@@ -231,6 +244,11 @@ async function displayChild() {
         nextPhotosButton.disabled = false;
     }
 
+    await children[childIds[curChildNum]].preloadPhotos()
+    if (!children[childIds[curChildNum]].onLastPage()) {
+        nextPhotosButton.disabled = false;
+    }
+
 }
 
 document.querySelector('#taxonSubmit').addEventListener('click', function() {
@@ -251,14 +269,16 @@ document.querySelector('#taxonSubmit').addEventListener('click', function() {
     });
 });
 
-nextChildButton.addEventListener('click', function() {
+nextChildButton.addEventListener('click', async function() {
     nextPhotosButton.disabled = true;
     prevPhotosButton.disabled = true;
+    await nextChildPromise;
     curChildNum += 1;
     displayChild()
     .catch(error => {
         alert("child api call error: " + error);
     });
+
 });
 
 prevChildButton.addEventListener('click', function() {
