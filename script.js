@@ -99,7 +99,7 @@ class Taxon {
         if (this.photos.length == 0) {
             this.observationCount = observationData.total_results;
         }        
-        // there is no way to get the numbers of licensed *photos* without making an arbitraryly large number of api requests
+        // there is no way to get the numbers of licensed *photos* without making an arbitrarily large number of api requests
 
         if (this.observationCount == 0) return;
         for (let observation of observationData.results) {
@@ -121,10 +121,10 @@ class Taxon {
         this.curMaxId = this.observations[this.observations.length - 1].id;
     }
 
-    async getLicensedPhotos (maxId = -1) {
+    async getLicensedPhotos () {
         let maxIdStr = "";
-        if (maxId != -1) {
-            maxIdStr = "&id_below=" + maxId;
+        if (this.curMaxId != -1) {
+            maxIdStr = "&id_below=" + this.curMaxId;
         }
         let perPageStr = "&per_page=" + PHOTODISPLAYNUM;
         const data = await getJSON("https://api.inaturalist.org/v1/observations?photo_license=cc-by%2Ccc-by-sa%2Ccc0&taxon_id=" + this.id + maxIdStr + perPageStr)
@@ -141,20 +141,20 @@ WHERE
         this.wikidataID = data?.results?.bindings[0]?.item?.value;
     }
     
-    async loadChild () {
-        if (this.loaded) return;
-        let observationsData = await this.getLicensedPhotos()
-        this.addObservations(observationsData)
-        if (this.photos.length < PHOTODISPLAYNUM * 2) {
-            await this.loadMorePhotos();
+    async loadPhotos () {
+        this.addObservations(await this.getLicensedPhotos());
+        if (this.observationCount == this.observations.length) {
+            this.loaded = true;
         }
-        await this.getWikidataId();
-        this.loaded = true;
     }
 
-    async loadMorePhotos () {
-        let observationsData = await this.getLicensedPhotos(this.curMaxId)
-        this.addObservations(observationsData)        
+    async preloadPhotos () {
+        if (this.loaded) {
+            return;
+        }
+        if (this.photos.length - this.photoPos < PHOTODISPLAYNUM * 2) {
+            this.addObservations(await this.getLicensedPhotos());
+        }
     }
 
     makePhotos () {
@@ -166,17 +166,28 @@ WHERE
         return photosDiv;
     }
 
-    async nextPhotos () {
+    nextPhotos () {
+        nextPhotosButton.disabled = true;
         this.photoPos += PHOTODISPLAYNUM;
-        if (this.photos.length + this.photoPos < PHOTODISPLAYNUM * 2) {
-            await this.loadMorePhotos();
-        }
+        prevPhotosButton.disabled = false;      
         return this.makePhotos();
     }
 
     prevPhotos () {
+        prevPhotosButton.disabled = true;
         this.photoPos -= PHOTODISPLAYNUM;
+        nextPhotosButton.disabled = false;
+        if (this.photoPos > 0) {
+            prevPhotosButton.disabled = false;
+        }
         return this.makePhotos();
+    }
+
+    onLastPage () {
+        if (this.photos.length - this.photoPos <= PHOTODISPLAYNUM) {
+            return true;
+        }
+        return false;
     }
 
 }
@@ -188,7 +199,7 @@ async function displayChild() {
         childIds.push(curChild.id);
         children[childIds[curChildNum]] = curChild;
 
-        await curChild.loadChild()
+        await curChild.loadPhotos()
     } else {
         curChild = children[childIds[curChildNum]];
     }
@@ -216,8 +227,9 @@ async function displayChild() {
         prevChildButton.innerHTML = "<--  " + parentTaxon.children[curChildNum - 1].name;
     }
 
-    prevPhotosButton.disabled = false;
-    nextPhotosButton.disabled = false;
+    if (!curChild.onLastPage()) {
+        nextPhotosButton.disabled = false;
+    }
 
 }
 
@@ -240,6 +252,8 @@ document.querySelector('#taxonSubmit').addEventListener('click', function() {
 });
 
 nextChildButton.addEventListener('click', function() {
+    nextPhotosButton.disabled = true;
+    prevPhotosButton.disabled = true;
     curChildNum += 1;
     displayChild()
     .catch(error => {
@@ -248,6 +262,8 @@ nextChildButton.addEventListener('click', function() {
 });
 
 prevChildButton.addEventListener('click', function() {
+    nextPhotosButton.disabled = true;
+    prevPhotosButton.disabled = true;
     curChildNum -= 1;
     displayChild()
     .catch(error => {
@@ -256,13 +272,16 @@ prevChildButton.addEventListener('click', function() {
 });
 
 nextPhotosButton.addEventListener('click', async function() {
-    iNatPhotosDiv.innerHTML = "";
-    iNatPhotosDiv.appendChild(await children[childIds[curChildNum]].nextPhotos());
-
+    iNatPhotosDiv.innerHTML = "Photos loaded: " + children[childIds[curChildNum]].photos.length;
+    iNatPhotosDiv.appendChild(children[childIds[curChildNum]].nextPhotos());
+    await children[childIds[curChildNum]].preloadPhotos()
+    if (!children[childIds[curChildNum]].onLastPage()) {
+        nextPhotosButton.disabled = false;
+    }
 });
 
 prevPhotosButton.addEventListener('click', async function() {
-    iNatPhotosDiv.innerHTML = "";
+    iNatPhotosDiv.innerHTML = "Photos loaded: " + children[childIds[curChildNum]].photos.length;
     iNatPhotosDiv.appendChild(children[childIds[curChildNum]].prevPhotos());
 });
 
