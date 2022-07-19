@@ -264,7 +264,10 @@ async function displayChild() {
     if (!children[childIds[curChildNum]].onLastPage()) {
         nextPhotosButton.disabled = false;
     }
-    
+    if (curChild.photoPos > 0) {
+        prevPhotosButton.disabled = false;
+    }
+    document.querySelector("#photos-loading").innerHTML = "";
 }
 
 async function iNatAutoCompleteMake() {
@@ -317,7 +320,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
 
     curChildNum = 0;
     await displayChild()     
-    document.querySelector("#photos-loading").innerHTML = "";
+    
 });
 
 nextChildButton.addEventListener('click', async function() {
