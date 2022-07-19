@@ -4,6 +4,9 @@
 // This will also be the number of observations retrieved at one time
 const PHOTODISPLAYNUM = 20;
 
+// Milliseconds to wait after user stops typing to display autocomplete results. Necessarry to ensure we don't spam the api
+const AUTOCOMPLETEWAIT = 500;
+
 let children = {};
 let parentTaxon;
 let childIds = [];
@@ -209,7 +212,7 @@ WHERE
 }
 
 async function loadNextChild(override = false) {
-    if (curChildNum == childIds.length - 1 || override) {
+    if ((curChildNum != parentTaxon.children.length - 1 && curChildNum == childIds.length - 1) || override) {
         let curChild = new Taxon(parentTaxon.children[curChildNum + 1]);
         childIds.push(curChild.id);
         children[childIds[curChildNum + 1]] = curChild;
@@ -220,33 +223,29 @@ async function loadNextChild(override = false) {
 }
 
 async function displayChild() {
-    let curChild;
-    if (curChildNum == childIds.length) {
-        curChild = new Taxon(parentTaxon.children[curChildNum]);
-        childIds.push(curChild.id);
-        children[childIds[curChildNum]] = curChild;
-
-        await curChild.loadPhotos()
-    } else {
-        curChild = children[childIds[curChildNum]];
-    }
-
     nextChildPromise = loadNextChild();
 
-    let para = document.createElement('p');
+    let curChild = children[childIds[curChildNum]];
 
+    let para = document.createElement('p');
+    if (curChild.observationCount == undefined) {
+        debugger;
+    }
     para.textContent = curChild.name + ": " + curChild.observationCount + " observations with licensed photos";
 
     iNatPhotosDiv.innerHTML = "";
     iNatPhotosDiv.appendChild(para);
     iNatPhotosDiv.appendChild(curChild.makePhotos());
 
+    
     if (curChildNum == parentTaxon.children.length - 1) {
         nextChildButton.disabled = true;
         nextChildButton.innerHTML = "last taxon";
     } else {
-        nextChildButton.disabled = false;
-        nextChildButton.innerHTML = parentTaxon.children[curChildNum + 1].name + "  -->";
+        nextChildPromise.then(() => {
+            nextChildButton.disabled = false;
+            nextChildButton.innerHTML = parentTaxon.children[curChildNum + 1].name + "  -->";
+        })              
     }
     if (curChildNum == 0) {
         prevChildButton.disabled = true;
@@ -296,7 +295,7 @@ function dropDownAutoComplete() {
 
 parentInput.addEventListener('input', () => {
     clearTimeout(inputWaitTimer)
-    inputWaitTimer = setTimeout(dropDownAutoComplete, 500);
+    inputWaitTimer = setTimeout(dropDownAutoComplete, AUTOCOMPLETEWAIT);
 });
 
 document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
@@ -306,33 +305,26 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     childIds = [];
 
     let taxonID = event.target.value;
-    getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID)
-    .then(async (data) => {        
-        
-        parentTaxon = new Taxon (data.results[0]);
+    let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID);
 
-        curChildNum = -1;
+    parentTaxon = new Taxon (data.results[0]);
 
-        await loadNextChild(true);
+    curChildNum = -1;
+    await loadNextChild(true)
 
-        curChildNum = 0;
-        displayChild()     
-        .catch(error => {
-            alert("display child error: " + error);
-        });
-    })
-    .catch(error => {
-        alert("parent api call error: " + error);
-    });
+    curChildNum = 0;
+    await displayChild()     
+    
 });
 
 nextChildButton.addEventListener('click', async function() {
+    nextChildButton.disabled = true;
     nextPhotosButton.disabled = true;
     prevPhotosButton.disabled = true;
     await nextChildPromise;
     curChildNum += 1;
-    nextChildPromise = loadNextChild();
-    displayChild()
+    
+    await displayChild()
     .catch(error => {
         alert("child api call error: " + error);
     });
@@ -340,6 +332,7 @@ nextChildButton.addEventListener('click', async function() {
 });
 
 prevChildButton.addEventListener('click', function() {
+    prevChildButton.disabled = true;
     nextPhotosButton.disabled = true;
     prevPhotosButton.disabled = true;
     curChildNum -= 1;
