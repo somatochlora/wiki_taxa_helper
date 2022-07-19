@@ -130,7 +130,7 @@ class Taxon {
             if (newObs.geoprivacy = null) newObs.geoprivacy = "open";            
             for (let i = 0; i < observation.photos.length; i++) {
                 let curPhoto = new Photo(observation, i);
-                if (curPhoto.isLicensed) this.photos.push(curPhoto);
+                if (curPhoto.isLicensed()) this.photos.push(curPhoto);
             }
             newObs.location = observation.location;
 
