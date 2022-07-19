@@ -103,9 +103,9 @@ class Taxon {
             latinName = "<i>" + latinName + "</i>";
         }
         if (this.hasCommonName) {
-            return this.commonName + " (" + latinName + ")";
+            return this.commonName + " (" + latinName + ") ";
         }
-        return latinName;
+        return latinName + " " + this.id;
     }
 
     addObservations(observationData) {        
@@ -269,17 +269,24 @@ async function displayChild() {
 async function iNatAutoCompleteMake() {
     let results = await getJSON("https://api.inaturalist.org/v1/taxa/autocomplete?q=" + parentInput.value);
     let n = (results.total_results > 10) ? 10 : results.total_results;
-    let autoCompleteDiv = document.createElement("div");
+    let autoCompleteList = document.createElement("ul");
 
     for (let i = 0; i < n; i++) {
         let curTax = new Taxon(results.results[i]);
 
-        let para = document.createElement("p");
-        para.innerHTML = curTax.formattedName();
-        autoCompleteDiv.appendChild(para);
+        let item = document.createElement("li");
+        item.innerHTML = curTax.formattedName();
+
+        let button = document.createElement("button");
+        button.className = "autocomplete-option";
+        button.value = curTax.id;
+        button.innerHTML = "select"
+        item.appendChild(button);
+
+        autoCompleteList.appendChild(item);
     }
     autocompleteResultsDiv.innerHTML = "";
-    autocompleteResultsDiv.appendChild(autoCompleteDiv);
+    autocompleteResultsDiv.appendChild(autoCompleteList);
 }
 
 function dropDownAutoComplete() {
@@ -288,7 +295,7 @@ function dropDownAutoComplete() {
 
 parentInput.addEventListener('input', () => {
     clearTimeout(inputWaitTimer)
-    inputWaitTimer = setTimeout(dropDownAutoComplete, 1000);
+    inputWaitTimer = setTimeout(dropDownAutoComplete, 500);
 });
 
 document.querySelector('#taxonSubmit').addEventListener('click', async function() {
