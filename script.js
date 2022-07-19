@@ -9,12 +9,15 @@ let parentTaxon;
 let childIds = [];
 let curChildNum;
 let nextChildPromise;
+let inputWaitTimer;
 
+const parentInput = document.querySelector("#iNatTaxonID");
 const iNatPhotosDiv = document.querySelector('#inat-photos');
 const prevChildButton = document.querySelector('#prev-child');
 const nextChildButton = document.querySelector('#next-child');
 const prevPhotosButton = document.querySelector('#prev-photos');
 const nextPhotosButton = document.querySelector('#next-photos');
+const autocompleteResultsDiv = document.querySelector('#autocomplete-results');
 
 async function getJSON(url) {
     const response = await fetch(url);
@@ -92,6 +95,17 @@ class Taxon {
         if (this.hasCommonName) this.name = this.commonName;
         else this.name = this.latinName;
         this.loaded = false;
+    }
+
+    formattedName() {
+        let latinName = this.latinName;
+        if (this.rank == "species" || this.rank == "genus" || this.rank == "subspecies") {
+            latinName = "<i>" + latinName + "</i>";
+        }
+        if (this.hasCommonName) {
+            return this.commonName + " (" + latinName + ")";
+        }
+        return latinName;
     }
 
     addObservations(observationData) {        
@@ -200,6 +214,7 @@ async function loadNextChild(override = false) {
         children[childIds[curChildNum + 1]] = curChild;
         await curChild.loadPhotos()
     }
+    // Still throwing erros when a child taxon has no photos TODO
     return true;
 }
 
@@ -250,6 +265,31 @@ async function displayChild() {
     }
 
 }
+
+async function iNatAutoCompleteMake() {
+    let results = await getJSON("https://api.inaturalist.org/v1/taxa/autocomplete?q=" + parentInput.value);
+    let n = (results.total_results > 10) ? 10 : results.total_results;
+    let autoCompleteDiv = document.createElement("div");
+
+    for (let i = 0; i < n; i++) {
+        let curTax = new Taxon(results.results[i]);
+
+        let para = document.createElement("p");
+        para.innerHTML = curTax.formattedName();
+        autoCompleteDiv.appendChild(para);
+    }
+    autocompleteResultsDiv.innerHTML = "";
+    autocompleteResultsDiv.appendChild(autoCompleteDiv);
+}
+
+function dropDownAutoComplete() {
+    iNatAutoCompleteMake();
+}
+
+parentInput.addEventListener('input', () => {
+    clearTimeout(inputWaitTimer)
+    inputWaitTimer = setTimeout(dropDownAutoComplete, 1000);
+});
 
 document.querySelector('#taxonSubmit').addEventListener('click', async function() {
     let taxonID = document.querySelector('#iNatTaxonID').value;
