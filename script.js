@@ -223,6 +223,7 @@ async function loadNextChild(override = false) {
 }
 
 async function displayChild() {
+    
     nextChildPromise = loadNextChild();
 
     let curChild = children[childIds[curChildNum]];
@@ -263,7 +264,7 @@ async function displayChild() {
     if (!children[childIds[curChildNum]].onLastPage()) {
         nextPhotosButton.disabled = false;
     }
-
+    
 }
 
 async function iNatAutoCompleteMake() {
@@ -291,16 +292,18 @@ async function iNatAutoCompleteMake() {
 
 function dropDownAutoComplete() {
     iNatAutoCompleteMake();
+    document.querySelector('#autocomplete-loading').innerHTML = "";
 }
 
 parentInput.addEventListener('input', () => {
+    document.querySelector('#autocomplete-loading').innerHTML = "loading...";
     clearTimeout(inputWaitTimer)
     inputWaitTimer = setTimeout(dropDownAutoComplete, AUTOCOMPLETEWAIT);
 });
 
 document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
     if (event.target.nodeName != 'BUTTON') return;
-
+    document.querySelector('#photos-loading').innerHTML = "loading...";
     children = {};
     childIds = [];
 
@@ -314,7 +317,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
 
     curChildNum = 0;
     await displayChild()     
-    
+    document.querySelector("#photos-loading").innerHTML = "";
 });
 
 nextChildButton.addEventListener('click', async function() {
