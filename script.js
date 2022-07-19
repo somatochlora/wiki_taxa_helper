@@ -10,6 +10,7 @@ let childIds = [];
 let curChildNum;
 let nextChildPromise;
 let inputWaitTimer;
+let autocompleteLoaded = false;
 
 const parentInput = document.querySelector("#iNatTaxonID");
 const iNatPhotosDiv = document.querySelector('#inat-photos');
@@ -298,8 +299,13 @@ parentInput.addEventListener('input', () => {
     inputWaitTimer = setTimeout(dropDownAutoComplete, 500);
 });
 
-document.querySelector('#taxonSubmit').addEventListener('click', async function() {
-    let taxonID = document.querySelector('#iNatTaxonID').value;
+document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
+    if (event.target.nodeName != 'BUTTON') return;
+
+    children = {};
+    childIds = [];
+
+    let taxonID = event.target.value;
     getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID)
     .then(async (data) => {        
         
