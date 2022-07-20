@@ -3,16 +3,19 @@
 <html lang="en">
     <head>
         <title>Wiki Taxa Helper</title>
+        <link rel = "stylesheet" href = "styles.css">
     </head>
     <body>
-        <p id = "intro">What taxa do you want to look up?</p>
-        <input type = "text" default = "iNat taxon number" id = "iNatTaxonID">
+        <p id = "intro">What taxon do you want to look up?</p>
+        <input type = "text" placeholder = "taxon name" id = "iNatTaxonID">
         <p id="autocomplete-loading"></p>
         <div id = "autocomplete-results"></div>
-        <button type = "button" id = "prev-child" disabled>previous taxon</button>
-        <button type = "button" id = "next-child" disabled>next taxon</button>
-        <button type = "button" id = "prev-photos" disabled>previous photos</button>
-        <button type = "button" id = "next-photos" disabled>next photos</button>
+        <p></p>
+        <button type = "button" id = "prev-child" hidden disabled>previous taxon</button>
+        <button type = "button" id = "next-child" hidden disabled>next taxon</button>
+        <p></p>
+        <button type = "button" id = "prev-photos" hidden disabled>previous photos</button>
+        <button type = "button" id = "next-photos" hidden disabled>next photos</button>
         <p id="photos-loading"></p>
         <div id = "inat-photos"></div>
 

@@ -367,6 +367,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     document.querySelector('#photos-loading').innerHTML = "loading...";
     children = {};
     childIds = [];
+    document.querySelector('#autocomplete-results').innerHTML = "";
 
     let taxonID = event.target.value;
     let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID);
@@ -377,7 +378,11 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     await loadNextChild(true)
 
     curChildNum = 0;
-    await displayChild()     
+    await displayChild()
+    nextChildButton.hidden = false;
+    prevChildButton.hidden = false;    
+    nextPhotosButton.hidden = false;
+    prevPhotosButton.hidden = false;  
     
 });
 
