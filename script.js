@@ -33,6 +33,7 @@ const nextChildButton = document.querySelector('#next-child');
 const prevPhotosButton = document.querySelector('#prev-photos');
 const nextPhotosButton = document.querySelector('#next-photos');
 const autocompleteResultsDiv = document.querySelector('#autocomplete-results');
+const photoModal = document.querySelector("#photo-modal");
 
 // Returns an object from the api when given the url
 async function getJSON(url) {
@@ -89,16 +90,22 @@ class Photo {
                 borderColour = "red";
                 break;
         }
-        image.style = "border:4px solid " + borderColour + ";";
+        image.style = "border:4px solid " + borderColour + "; border-radius:15px;";
 
-        let link = document.createElement('a');
-        link.target = "_blank";
-        link.href = "https://www.inaturalist.org/observations/" + this.observationId;     
-        link.style = "margin:4px;"
+        let button = document.createElement('button');
+        //link.target = "_blank";
+        //link.href = "https://www.inaturalist.org/observations/" + this.observationId;     
+        button.style = "margin:4px; padding:4px;";
+        button.value = this.id;
 
-        link.appendChild(image);       
+        button.appendChild(image);       
 
-        return link;
+        return button;
+    }
+
+    getSizeUrl(size) {
+        //size can be square, small, medium, large, original
+        return this.url.replace("square", size);
     }
 
 }
@@ -120,7 +127,8 @@ class Taxon {
         this.hasCommonName = (this.commonName != undefined);
 
         this.observations = [];
-        this.photos = [];
+        this.photos = {};
+        this.photoIds = [];
 
         // index of the first photo currently displayed
         this.photoPos = 0;
@@ -151,7 +159,7 @@ class Taxon {
     addObservations(observationData) {        
         
         // this is NOT the same as the length of this.observations, as that only returns the number of observations in the current json request
-        if (this.photos.length == 0) {
+        if (this.photoIds.length == 0) {
             this.observationCount = observationData.total_results;
         }        
         // there is no way to get the numbers of licensed *photos* without making an arbitrarily large number of api requests
@@ -167,7 +175,8 @@ class Taxon {
             if (newObs.geoprivacy = null) newObs.geoprivacy = "open";  // if an iNat observation geoprivacy has never been changed, it will show up as "null"          
             for (let i = 0; i < observation.photos.length; i++) {
                 let curPhoto = new Photo(observation, i);
-                if (curPhoto.isLicensed()) this.photos.push(curPhoto); // it is possible for only some of the photos in an observation to be freely licensed
+                if (curPhoto.isLicensed()) this.photos[curPhoto.id] = curPhoto; // it is possible for only some of the photos in an observation to be freely licensed
+                this.photoIds.push(curPhoto.id);
             }
             newObs.location = observation.location;
 
@@ -224,8 +233,8 @@ WHERE
     makePhotos () {
         let photosDiv = document.createElement('div');
         for (let i = this.photoPos; i < this.photoPos + PHOTODISPLAYNUM; i++) {
-            if (i == this.photos.length) break;
-            photosDiv.appendChild(this.photos[i].returnDiv());
+            if (i == this.photoIds.length) break;
+            photosDiv.appendChild(this.photos[this.photoIds[i]].returnDiv());
         }
         photosDiv.id = "photos-page";
         return photosDiv;
@@ -252,7 +261,7 @@ WHERE
 
     // checks whether there are any more pages of photos
     onLastPage () {
-        if (this.photos.length - this.photoPos <= PHOTODISPLAYNUM) {
+        if (this.photoIds.length - this.photoPos <= PHOTODISPLAYNUM) {
             return true;
         }
         return false;
@@ -426,3 +435,26 @@ prevPhotosButton.addEventListener('click', async function() {
     iNatPhotosDiv.appendChild(children[childIds[curChildNum]].prevPhotos());
 });
 
+document.querySelector('#inat-photos').addEventListener('click', function(event) {
+    let curImgId;
+    if (event.target.nodeName == 'BUTTON') {
+        curImgId = event.target.value;
+    } else if (event.target.nodeName == 'IMG') {
+        curImgId = event.target.parentNode.value;
+    } else {
+        return;
+    }
+    let curImg = children[childIds[curChildNum]].photos[curImgId];
+    
+    let imgHtml = document.createElement("img");
+    imgHtml.src = curImg.getSizeUrl("medium");
+
+    document.querySelector('#photo-modal-content').innerHTML = "";
+    document.querySelector('#photo-modal-content').appendChild(imgHtml);
+
+    photoModal.style.display = "block";
+});
+
+document.querySelector('#close-photo-modal').addEventListener('click', function(event) {
+    photoModal.style.display = "none";
+});
