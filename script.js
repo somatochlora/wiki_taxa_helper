@@ -221,7 +221,7 @@ WHERE
         if (this.loaded) {
             return;
         }
-        if (this.photos.length - this.photoPos < PHOTODISPLAYNUM * 2) {
+        if (this.photoIds.length - this.photoPos < PHOTODISPLAYNUM * 2) {
             this.addObservations(await this.getLicensedPhotos());
         }
         if (this.observationCount == this.observations.length) {
