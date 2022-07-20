@@ -227,6 +227,7 @@ WHERE
             if (i == this.photos.length) break;
             photosDiv.appendChild(this.photos[i].returnDiv());
         }
+        photosDiv.id = "photos-page";
         return photosDiv;
     }
 
@@ -406,7 +407,8 @@ prevChildButton.addEventListener('click', function() {
 });
 
 nextPhotosButton.addEventListener('click', async function() {
-    iNatPhotosDiv.innerHTML = "Photos loaded: " + children[childIds[curChildNum]].photos.length;
+
+    iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
     iNatPhotosDiv.appendChild(children[childIds[curChildNum]].nextPhotos());
     await children[childIds[curChildNum]].preloadPhotos()
     if (!children[childIds[curChildNum]].onLastPage()) {
@@ -415,7 +417,7 @@ nextPhotosButton.addEventListener('click', async function() {
 });
 
 prevPhotosButton.addEventListener('click', async function() {
-    iNatPhotosDiv.innerHTML = "Photos loaded: " + children[childIds[curChildNum]].photos.length;
+    iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
     iNatPhotosDiv.appendChild(children[childIds[curChildNum]].prevPhotos());
 });
 
