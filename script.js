@@ -7,14 +7,25 @@ const PHOTODISPLAYNUM = 20;
 // Milliseconds to wait after user stops typing to display autocomplete results. Necessarry to ensure we don't spam the api
 const AUTOCOMPLETEWAIT = 500;
 
+// All taxa with photos loaded, keyed by iNat ID [type: Taxon]
 let children = {};
-let parentTaxon;
-let childIds = [];
-let curChildNum;
-let nextChildPromise;
-let inputWaitTimer;
-let autocompleteLoaded = false;
 
+// The taxon selected from the search bar/autocomplete [type: Taxon]
+let parentTaxon;
+
+// Ordered list of ids for the children
+let childIds = [];
+
+// The current child that is being displayed with photos
+let curChildNum;
+
+// A promise that resolves when the next child is fully loaded
+let nextChildPromise;
+
+// A timer that resets any time there is input in the main search bar
+let inputWaitTimer;
+
+// Quick references for various html elements
 const parentInput = document.querySelector("#iNatTaxonID");
 const iNatPhotosDiv = document.querySelector('#inat-photos');
 const prevChildButton = document.querySelector('#prev-child');
@@ -23,6 +34,7 @@ const prevPhotosButton = document.querySelector('#prev-photos');
 const nextPhotosButton = document.querySelector('#next-photos');
 const autocompleteResultsDiv = document.querySelector('#autocomplete-results');
 
+// Returns an object from the api when given the url
 async function getJSON(url) {
     const response = await fetch(url);
     if (!response.ok) // check if response worked (no 404 errors etc...)
@@ -32,13 +44,21 @@ async function getJSON(url) {
     return data; // returns a promise, which resolves to this data value
 }
 
+// Each photo returned from iNaturalist is an instance of this class
 class Photo {
     constructor(observationData, photoNum) {
+        // unique iNat photo ID
         this.id = observationData.photos[photoNum].id;
         this.license = observationData.photos[photoNum].license_code;
         this.url = observationData.photos[photoNum].url;
+
+        // string for the person who uploaded the photo
         this.attribution = observationData.photos[photoNum].attribution;
+
+        // iNat id of the observation this photo belongs to
         this.observationId = observationData.id;
+
+        // research grade, needs id, or casual
         this.qualityGrade = observationData.quality_grade;
     }
 
@@ -53,6 +73,7 @@ class Photo {
         return false;
     }
 
+    // returns a formatted html element for the photo
     returnDiv() {
         let image = document.createElement('img');
         image.src = this.url;
@@ -82,25 +103,39 @@ class Photo {
 
 }
 
+// various methods for interacting with taxa returned from iNat
 class Taxon {
     constructor(taxonData) {
+        // unique iNaturalist id
         this.id = taxonData.id;
         this.latinName = taxonData.name;
         this.rank = taxonData.rank;
+
+        //array of child taxa
         this.children = taxonData.children;
         this.hasChildren = (this.children != undefined);
         if (this.hasChildren) this.childrenNum = this.children.length;
+
         this.commonName = taxonData.preferred_common_name;
         this.hasCommonName = (this.commonName != undefined);
+
         this.observations = [];
         this.photos = [];
+
+        // index of the first photo currently displayed
         this.photoPos = 0;
+
+        // the smallest ID of all observations currently loaded, used for pagination
         this.curMaxId = -1;
+
         if (this.hasCommonName) this.name = this.commonName;
         else this.name = this.latinName;
+
+        // true when every observation and photo has been loaded
         this.loaded = false;
     }
 
+    // a nicely formatted name to use in output
     formattedName() {
         let latinName = this.latinName;
         if (this.rank == "species" || this.rank == "genus" || this.rank == "subspecies") {
@@ -112,6 +147,7 @@ class Taxon {
         return latinName + " " + this.id;
     }
 
+    // loads all the observations and photos from a single api call
     addObservations(observationData) {        
         
         // this is NOT the same as the length of this.observations, as that only returns the number of observations in the current json request
@@ -121,16 +157,17 @@ class Taxon {
         // there is no way to get the numbers of licensed *photos* without making an arbitrarily large number of api requests
 
         if (this.observationCount == 0) return;
+
         for (let observation of observationData.results) {
             let newObs = {};
             newObs.qualityGrade = observation.quality_grade;
             newObs.datetime = observation.time_observed_at;
             newObs.id = observation.id;
             newObs.geoprivacy = observation.geoprivacy;
-            if (newObs.geoprivacy = null) newObs.geoprivacy = "open";            
+            if (newObs.geoprivacy = null) newObs.geoprivacy = "open";  // if an iNat observation geoprivacy has never been changed, it will show up as "null"          
             for (let i = 0; i < observation.photos.length; i++) {
                 let curPhoto = new Photo(observation, i);
-                if (curPhoto.isLicensed()) this.photos.push(curPhoto);
+                if (curPhoto.isLicensed()) this.photos.push(curPhoto); // it is possible for only some of the photos in an observation to be freely licensed
             }
             newObs.location = observation.location;
 
@@ -140,6 +177,7 @@ class Taxon {
         this.curMaxId = this.observations[this.observations.length - 1].id;
     }
 
+    // Will do an api call to retrieve the next set of observations with freely licensed photos
     async getLicensedPhotos () {
         let maxIdStr = "";
         if (this.curMaxId != -1) {
@@ -150,6 +188,7 @@ class Taxon {
         return data;
     }
 
+    // will return the wikidata id for the taxon if available
     async getWikidataId () {
         const sparqlQuery = `SELECT ?item
 WHERE
@@ -160,6 +199,7 @@ WHERE
         this.wikidataID = data?.results?.bindings[0]?.item?.value;
     }
     
+    // load the first set of photos
     async loadPhotos () {
         this.addObservations(await this.getLicensedPhotos());
         if (this.observationCount == this.observations.length) {
@@ -167,6 +207,7 @@ WHERE
         }
     }
 
+    // used for loading the next set of photos TODO can probably be combined with the above
     async preloadPhotos () {
         if (this.loaded) {
             return;
@@ -174,8 +215,12 @@ WHERE
         if (this.photos.length - this.photoPos < PHOTODISPLAYNUM * 2) {
             this.addObservations(await this.getLicensedPhotos());
         }
+        if (this.observationCount == this.observations.length) {
+            this.loaded = true;
+        }
     }
 
+    // create an html element containing the current set of photos
     makePhotos () {
         let photosDiv = document.createElement('div');
         for (let i = this.photoPos; i < this.photoPos + PHOTODISPLAYNUM; i++) {
@@ -185,6 +230,7 @@ WHERE
         return photosDiv;
     }
 
+    // go to the next page of photos
     nextPhotos () {
         nextPhotosButton.disabled = true;
         this.photoPos += PHOTODISPLAYNUM;
@@ -192,6 +238,7 @@ WHERE
         return this.makePhotos();
     }
 
+    // go to the previous page of photos
     prevPhotos () {
         prevPhotosButton.disabled = true;
         this.photoPos -= PHOTODISPLAYNUM;
@@ -202,6 +249,7 @@ WHERE
         return this.makePhotos();
     }
 
+    // checks whether there are any more pages of photos
     onLastPage () {
         if (this.photos.length - this.photoPos <= PHOTODISPLAYNUM) {
             return true;
@@ -211,7 +259,11 @@ WHERE
 
 }
 
+// preloads the next child taxa before it needs to be displayed
 async function loadNextChild(override = false) {
+    // override is so we can use this function to load the very first child
+    // the other two expressions check that (a) we are not already at the last child so no preloading necessary, and
+    // (b) that the next child is not already loaded
     if ((curChildNum != parentTaxon.children.length - 1 && curChildNum == childIds.length - 1) || override) {
         let curChild = new Taxon(parentTaxon.children[curChildNum + 1]);
         childIds.push(curChild.id);
@@ -222,27 +274,28 @@ async function loadNextChild(override = false) {
     return true;
 }
 
+// displays the current child taxon and preloads the next
 async function displayChild() {
     
+    // starts preloading the next child
     nextChildPromise = loadNextChild();
 
     let curChild = children[childIds[curChildNum]];
 
     let para = document.createElement('p');
-    if (curChild.observationCount == undefined) {
-        debugger;
-    }
+
     para.textContent = curChild.name + ": " + curChild.observationCount + " observations with licensed photos";
 
     iNatPhotosDiv.innerHTML = "";
     iNatPhotosDiv.appendChild(para);
     iNatPhotosDiv.appendChild(curChild.makePhotos());
 
-    
+    // enables/disables the buttons for navigating between children as necessarry 
     if (curChildNum == parentTaxon.children.length - 1) {
         nextChildButton.disabled = true;
         nextChildButton.innerHTML = "last taxon";
     } else {
+        // only enables the next child button when the next child is loaded
         nextChildPromise.then(() => {
             nextChildButton.disabled = false;
             nextChildButton.innerHTML = parentTaxon.children[curChildNum + 1].name + "  -->";
@@ -256,6 +309,7 @@ async function displayChild() {
         prevChildButton.innerHTML = "<--  " + parentTaxon.children[curChildNum - 1].name;
     }
 
+    // enables/disables the buttons for navigating between photos as necessarry 
     if (!curChild.onLastPage()) {
         nextPhotosButton.disabled = false;
     }
@@ -270,8 +324,11 @@ async function displayChild() {
     document.querySelector("#photos-loading").innerHTML = "";
 }
 
+// creatse the html for the autocomplete results
 async function iNatAutoCompleteMake() {
     let results = await getJSON("https://api.inaturalist.org/v1/taxa/autocomplete?q=" + parentInput.value);
+    
+    // caps the autocomplete results dislpayed at 10
     let n = (results.total_results > 10) ? 10 : results.total_results;
     let autoCompleteList = document.createElement("ul");
 
