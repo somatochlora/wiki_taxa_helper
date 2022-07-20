@@ -152,7 +152,7 @@ class Taxon {
         if (this.hasCommonName) {
             return this.commonName + " (" + latinName + ") ";
         }
-        return latinName + " " + this.id;
+        return latinName;
     }
 
     // loads all the observations and photos from a single api call
@@ -449,12 +449,18 @@ document.querySelector('#inat-photos').addEventListener('click', function(event)
     let imgHtml = document.createElement("img");
     imgHtml.src = curImg.getSizeUrl("medium");
 
-    document.querySelector('#photo-modal-content').innerHTML = "";
-    document.querySelector('#photo-modal-content').appendChild(imgHtml);
+    document.querySelector('#photo-modal-photo').innerHTML = "";
+    document.querySelector('#photo-modal-photo').appendChild(imgHtml);
 
     photoModal.style.display = "block";
 });
 
 document.querySelector('#close-photo-modal').addEventListener('click', function(event) {
     photoModal.style.display = "none";
+});
+
+document.querySelector('#photo-modal').addEventListener('click', function (event) {
+    if (event.target.id == 'photo-modal') {
+        photoModal.style.display = "none";
+    }
 });
