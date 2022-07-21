@@ -7,10 +7,9 @@ const PHOTODISPLAYNUM = 20;
 // Milliseconds to wait after user stops typing to display autocomplete results. Necessarry to ensure we don't spam the api
 const AUTOCOMPLETEWAIT = 500;
 
-const TAXONOMYSTRUCTURE = {"1":["kingdom"],"2":["phylum"],"3":["subphylum"],"4":["superclass"],"5":["class"],"6":["subclass"],
-"7":["superorder"],"8":["order"],"9":["suborder"],"10":["infraorder"],"11":["superfamily"],
-"12":["epifamily"],"13":["family"],"14":["subfamily"],"15":["supertribe"],"16":["tribe"],
-"17":["subtribe"],"18":["genus","genushybrid"],"19":["species","hybrid"],"20":["subspecies"],"21":["variety"],"22":["form"]};
+const TAXONOMYSTRUCTURE = ["kingdom", "phylum", "subphylum", "superclass", "class", "subclass", "superorder", "order", 
+"suborder", "infraorder", "superfamily", "epifamily", "family", "subfamily", "supertribe", "tribe", "subtribe", "genus", "subgenus", "section",
+"species", "subspecies", "variety", "form"];
 
 // All taxa with photos loaded, keyed by iNat ID [type: Taxon]
 let leaves = {};
@@ -123,7 +122,8 @@ class Taxon {
         // unique iNaturalist id
         this.id = taxonData.id;
         this.latinName = taxonData.name;
-        this.rank = taxonData.rank;
+        this.rank = taxonData.rank
+        this.numericRank = TAXONOMYSTRUCTURE.indexOf(this.rank);
 
         //array of child taxa
         this.childrenData = taxonData.children;
@@ -153,40 +153,52 @@ class Taxon {
         // true when every observation and photo has been loaded
         this.photosLoaded = false;
 
+        this.treeLoaded = false;
         this.parent = parent;
         this.traversalPointer = this;
     }
 
-    getRankNumeric() {
-
-    }
-
     async nextLeaf(lowRank, treeBase = this) {
-        if (this.getRankNumeric() <= lowRank) {
+
+        alert("species: " + this.name + " rank: " + this.rank + " " + this.numericRank);
+
+        // case the parent taxon has no children
+        if (this == treeBase && !this.hasMoreChildren && this.children.length == 0) {
+            return this;
+        }
+        
+        if (this == treeBase) {
+            
+            return this.traversalPointer.nextLeaf();
+        }
+
+        // case we have found a leaf
+        if (this.numericRank >= lowRank) {
+            alert("found leaf: " + this.name);
+            this.parent.childrenData.pop();
             return this;
         }
 
+        // case we are done with this node and need to move up a level
+        
         if (!this.hasMoreChildren) {
-            if(treeBase == this) {
-                return 0;
-            }
             treeBase.traversalPointer = this.parent;
+            this.parent.childrenData.pop();
+            let tmp = await this.nextLeaf(lowRank, treeBase);
+            return tmp;
         }
 
         treeBase.traversalPointer = this;
 
-        if (this.children.at[-1].hasMoreChildren) {
-            return await this.children.at[-1].nextLeaf();
-        }
-        this.childrenData.pop();
-        let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.childrenData.at[-1].id);
+        let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.childrenData[this.childrenData.length - 1].id);
         let newChild = new Taxon (data.results[0], this);        
         this.children.push(newChild);
 
         if (this.childrenData.length == 0) {
             this.hasMoreChildren = false;
         }
-        return await newChild.nextLeaf(lowRank, treeBase);
+        let tmp = await newChild.nextLeaf(lowRank, treeBase);
+        return tmp;
     }
 
     // a nicely formatted name to use in output
@@ -428,7 +440,16 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID);
 
     parentTaxon = new Taxon (data.results[0]);
-
+    let tmp = await parentTaxon.nextLeaf(20);
+    alert("final: " + tmp.name);
+    tmp = await parentTaxon.nextLeaf(20);
+    alert("final: " + tmp.name);
+    tmp = await parentTaxon.nextLeaf(20);
+    alert("final: " + tmp.name);
+    tmp = await parentTaxon.nextLeaf(20);
+    alert("final: " + tmp.name);
+    tmp = await parentTaxon.nextLeaf(20);
+    alert("final: " + tmp.name);
     curChildNum = -1;
     await loadNextChild(true)
 
