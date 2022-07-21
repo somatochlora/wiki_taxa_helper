@@ -13,7 +13,7 @@ const TAXONOMYSTRUCTURE = {"1":["kingdom"],"2":["phylum"],"3":["subphylum"],"4":
 "17":["subtribe"],"18":["genus","genushybrid"],"19":["species","hybrid"],"20":["subspecies"],"21":["variety"],"22":["form"]};
 
 // All taxa with photos loaded, keyed by iNat ID [type: Taxon]
-let children = {};
+let leaves = {};
 
 // The taxon selected from the search bar/autocomplete [type: Taxon]
 let parentTaxon;
@@ -119,16 +119,20 @@ class Photo {
 
 // various methods for interacting with taxa returned from iNat
 class Taxon {
-    constructor(taxonData) {
+    constructor(taxonData, parent = false) {
         // unique iNaturalist id
         this.id = taxonData.id;
         this.latinName = taxonData.name;
         this.rank = taxonData.rank;
 
         //array of child taxa
-        this.children = taxonData.children;
-        this.hasChildren = (this.children != undefined);
-        if (this.hasChildren) this.childrenNum = this.children.length;
+        this.childrenData = taxonData.children;
+        this.children = [];
+        this.hasMoreChildren = (this.childrenData != undefined);
+        if (this.hasMoreChildren) {
+            this.childrenNum = this.childrenData.length;
+            this.childrenData = this.childrenData.reverse();
+        }
 
         this.commonName = taxonData.preferred_common_name;
         this.hasCommonName = (this.commonName != undefined);
@@ -147,7 +151,42 @@ class Taxon {
         else this.name = this.latinName;
 
         // true when every observation and photo has been loaded
-        this.loaded = false;
+        this.photosLoaded = false;
+
+        this.parent = parent;
+        this.traversalPointer = this;
+    }
+
+    getRankNumeric() {
+
+    }
+
+    async nextLeaf(lowRank, treeBase = this) {
+        if (this.getRankNumeric() <= lowRank) {
+            return this;
+        }
+
+        if (!this.hasMoreChildren) {
+            if(treeBase == this) {
+                return 0;
+            }
+            treeBase.traversalPointer = this.parent;
+        }
+
+        treeBase.traversalPointer = this;
+
+        if (this.children.at[-1].hasMoreChildren) {
+            return await this.children.at[-1].nextLeaf();
+        }
+        this.childrenData.pop();
+        let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.childrenData.at[-1].id);
+        let newChild = new Taxon (data.results[0], this);        
+        this.children.push(newChild);
+
+        if (this.childrenData.length == 0) {
+            this.hasMoreChildren = false;
+        }
+        return await newChild.nextLeaf(lowRank, treeBase);
     }
 
     // a nicely formatted name to use in output
@@ -219,20 +258,20 @@ WHERE
     async loadPhotos () {
         this.addObservations(await this.getLicensedPhotos());
         if (this.observationCount == this.observations.length) {
-            this.loaded = true;
+            this.photosLoaded = true;
         }
     }
 
     // used for loading the next set of photos TODO can probably be combined with the above
     async preloadPhotos () {
-        if (this.loaded) {
+        if (this.photosLoaded) {
             return;
         }
         if (this.photoIds.length - this.photoPos < PHOTODISPLAYNUM * 2) {
             this.addObservations(await this.getLicensedPhotos());
         }
         if (this.observationCount == this.observations.length) {
-            this.loaded = true;
+            this.photosLoaded = true;
         }
     }
 
@@ -281,10 +320,10 @@ async function loadNextChild(override = false) {
     // override is so we can use this function to load the very first child
     // the other two expressions check that (a) we are not already at the last child so no preloading necessary, and
     // (b) that the next child is not already loaded
-    if ((curChildNum != parentTaxon.children.length - 1 && curChildNum == childIds.length - 1) || override) {
-        let curChild = new Taxon(parentTaxon.children[curChildNum + 1]);
+    if ((curChildNum != parentTaxon.childrenData.length - 1 && curChildNum == childIds.length - 1) || override) {
+        let curChild = new Taxon(parentTaxon.childrenData[curChildNum + 1]);
         childIds.push(curChild.id);
-        children[childIds[curChildNum + 1]] = curChild;
+        leaves[childIds[curChildNum + 1]] = curChild;
         await curChild.loadPhotos()
     }
     // Still throwing erros when a child taxon has no photos TODO
@@ -297,7 +336,7 @@ async function displayChild() {
     // starts preloading the next child
     nextChildPromise = loadNextChild();
 
-    let curChild = children[childIds[curChildNum]];
+    let curChild = leaves[childIds[curChildNum]];
 
     let para = document.createElement('p');
 
@@ -308,14 +347,14 @@ async function displayChild() {
     iNatPhotosDiv.appendChild(curChild.makePhotos());
 
     // enables/disables the buttons for navigating between children as necessarry 
-    if (curChildNum == parentTaxon.children.length - 1) {
+    if (curChildNum == parentTaxon.childrenData.length - 1) {
         nextChildButton.disabled = true;
         nextChildButton.innerHTML = "last taxon";
     } else {
         // only enables the next child button when the next child is loaded
         nextChildPromise.then(() => {
             nextChildButton.disabled = false;
-            nextChildButton.innerHTML = parentTaxon.children[curChildNum + 1].name + "  -->";
+            nextChildButton.innerHTML = parentTaxon.childrenData[curChildNum + 1].name + "  -->";
         })              
     }
     if (curChildNum == 0) {
@@ -323,7 +362,7 @@ async function displayChild() {
         prevChildButton.innerHTML = "first taxon";
     } else {   
         prevChildButton.disabled = false;
-        prevChildButton.innerHTML = "<--  " + parentTaxon.children[curChildNum - 1].name;
+        prevChildButton.innerHTML = "<--  " + parentTaxon.childrenData[curChildNum - 1].name;
     }
 
     // enables/disables the buttons for navigating between photos as necessarry 
@@ -331,8 +370,8 @@ async function displayChild() {
         nextPhotosButton.disabled = false;
     }
 
-    await children[childIds[curChildNum]].preloadPhotos()
-    if (!children[childIds[curChildNum]].onLastPage()) {
+    await leaves[childIds[curChildNum]].preloadPhotos()
+    if (!leaves[childIds[curChildNum]].onLastPage()) {
         nextPhotosButton.disabled = false;
     }
     if (curChild.photoPos > 0) {
@@ -381,7 +420,7 @@ parentInput.addEventListener('input', () => {
 document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
     if (event.target.nodeName != 'BUTTON') return;
     document.querySelector('#photos-loading').innerHTML = "loading...";
-    children = {};
+    leaves = {};
     childIds = [];
     document.querySelector('#autocomplete-results').innerHTML = "";
 
@@ -431,15 +470,15 @@ nextPhotosButton.addEventListener('click', async function() {
 
     iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
     iNatPhotosDiv.appendChild(children[childIds[curChildNum]].nextPhotos());
-    await children[childIds[curChildNum]].preloadPhotos()
-    if (!children[childIds[curChildNum]].onLastPage()) {
+    await leaves[childIds[curChildNum]].preloadPhotos()
+    if (!leaves[childIds[curChildNum]].onLastPage()) {
         nextPhotosButton.disabled = false;
     }
 });
 
 prevPhotosButton.addEventListener('click', async function() {
     iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
-    iNatPhotosDiv.appendChild(children[childIds[curChildNum]].prevPhotos());
+    iNatPhotosDiv.appendChild(leaves[childIds[curChildNum]].prevPhotos());
 });
 
 document.querySelector('#inat-photos').addEventListener('click', function(event) {
@@ -451,7 +490,7 @@ document.querySelector('#inat-photos').addEventListener('click', function(event)
     } else {
         return;
     }
-    let curTaxon = children[childIds[curChildNum]];
+    let curTaxon = leaves[childIds[curChildNum]];
     let curImg = curTaxon.photos[curImgId];
     let curObs = curImg.observationRef;
 
