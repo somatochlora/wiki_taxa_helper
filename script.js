@@ -7,6 +7,11 @@ const PHOTODISPLAYNUM = 20;
 // Milliseconds to wait after user stops typing to display autocomplete results. Necessarry to ensure we don't spam the api
 const AUTOCOMPLETEWAIT = 500;
 
+const TAXONOMYSTRUCTURE = {"1":["kingdom"],"2":["phylum"],"3":["subphylum"],"4":["superclass"],"5":["class"],"6":["subclass"],
+"7":["superorder"],"8":["order"],"9":["suborder"],"10":["infraorder"],"11":["superfamily"],
+"12":["epifamily"],"13":["family"],"14":["subfamily"],"15":["supertribe"],"16":["tribe"],
+"17":["subtribe"],"18":["genus","genushybrid"],"19":["species","hybrid"],"20":["subspecies"],"21":["variety"],"22":["form"]};
+
 // All taxa with photos loaded, keyed by iNat ID [type: Taxon]
 let children = {};
 
@@ -47,7 +52,7 @@ async function getJSON(url) {
 
 // Each photo returned from iNaturalist is an instance of this class
 class Photo {
-    constructor(observationData, photoNum) {
+    constructor(observationData, photoNum, observationRef) {
         // unique iNat photo ID
         this.id = observationData.photos[photoNum].id;
         this.license = observationData.photos[photoNum].license_code;
@@ -61,6 +66,8 @@ class Photo {
 
         // research grade, needs id, or casual
         this.qualityGrade = observationData.quality_grade;
+
+        this.observationRef = observationRef;
     }
 
     // does photo have a commons-compatible license?
@@ -174,7 +181,7 @@ class Taxon {
             newObs.geoprivacy = observation.geoprivacy;
             if (newObs.geoprivacy = null) newObs.geoprivacy = "open";  // if an iNat observation geoprivacy has never been changed, it will show up as "null"          
             for (let i = 0; i < observation.photos.length; i++) {
-                let curPhoto = new Photo(observation, i);
+                let curPhoto = new Photo(observation, i, newObs);
                 if (curPhoto.isLicensed()) this.photos[curPhoto.id] = curPhoto; // it is possible for only some of the photos in an observation to be freely licensed
                 this.photoIds.push(curPhoto.id);
             }
@@ -444,13 +451,33 @@ document.querySelector('#inat-photos').addEventListener('click', function(event)
     } else {
         return;
     }
-    let curImg = children[childIds[curChildNum]].photos[curImgId];
-    
+    let curTaxon = children[childIds[curChildNum]];
+    let curImg = curTaxon.photos[curImgId];
+    let curObs = curImg.observationRef;
+
     let imgHtml = document.createElement("img");
     imgHtml.src = curImg.getSizeUrl("medium");
 
     document.querySelector('#photo-modal-photo').innerHTML = "";
     document.querySelector('#photo-modal-photo').appendChild(imgHtml);
+
+    document.querySelector('#photo-modal-text').innerHTML = "";
+    let paras = [];
+    paras.push(curTaxon.formattedName());
+    paras.push(curObs.location);
+    paras.push(curObs.datetime);
+    paras.push(curImg.attribution);
+    let link = document.createElement("a");
+    link.innerHTML = "iNaturalist Observation Link";
+    link.href = "https://www.inaturalist.org/observations/" + curObs.id;
+    link.target = "_blank";
+
+    for (let i = 0; i < paras.length; i++) {
+        let para = document.createElement("p");
+        para.innerHTML = paras[i];
+        document.querySelector('#photo-modal-text').appendChild(para);
+    }
+    document.querySelector('#photo-modal-text').appendChild(link);
 
     photoModal.style.display = "block";
 });

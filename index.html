@@ -6,7 +6,7 @@
         <link rel = "stylesheet" href = "styles.css">
     </head>
     <body>
-        <p id = "intro">What taxon do you want to look up?</p>
+        <label for = "iNatTaxonID">What taxon do you want to look up?</label>
         <input type = "text" placeholder = "taxon name" id = "iNatTaxonID">
         <p id="autocomplete-loading"></p>
         <div id = "autocomplete-results"></div>
@@ -24,6 +24,7 @@
               <span id="close-photo-modal" class="close">&times;</span>
               <div id="photo-modal-photo"></div>
               <div id="photo-modal-text"></div>
+              <button id="photo-modal-upload" disabled>Upload to Commons</button>
             </div>          
           </div>
 
