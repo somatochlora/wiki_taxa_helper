@@ -158,46 +158,58 @@ class Taxon {
         this.traversalPointer = this;
     }
 
-    async nextLeaf(lowRank, treeBase = this) {
 
-        alert("species: " + this.name + " rank: " + this.rank + " " + this.numericRank);
+    async nextLeaf(lowRank) {
+        console.log("[" + this.formattedName() + "] traversal pointer: " + this.traversalPointer.formattedName());
+        return this.traversalPointer.nextLeafInner(lowRank, this);        
+    }
 
-        // case the parent taxon has no children
-        if (this == treeBase && !this.hasMoreChildren && this.children.length == 0) {
-            return this;
-        }
-        
-        if (this == treeBase) {
-            
-            return this.traversalPointer.nextLeaf();
-        }
+    async nextLeafInner (lowRank, treeBase) {
 
         // case we have found a leaf
-        if (this.numericRank >= lowRank) {
-            alert("found leaf: " + this.name);
-            this.parent.childrenData.pop();
+        if (this.numericRank >= lowRank && !this.treeLoaded) {
+            console.log("[" + this.formattedName() + "] found leaf");
+            if (this.parent) {
+                this.parent.childrenData.pop();
+            }
+            this.treeLoaded == true;
             return this;
         }
 
-        // case we are done with this node and need to move up a level
-        
-        if (!this.hasMoreChildren) {
+        // case the parent taxon has no children or all children have been found
+        if (this == treeBase && !this.hasMoreChildren || this.treeloaded) {
+            console.log("[" + this.formattedName() + "] finished!");
+            return false;
+        }        
+
+        // case we are done with this node and need to move up a level        
+        if (this.hasMoreChildren == false) {
+            console.log("[" + this.formattedName() + "] time to move up a level");
             treeBase.traversalPointer = this.parent;
             this.parent.childrenData.pop();
-            let tmp = await this.nextLeaf(lowRank, treeBase);
+            if (this.parent.childrenData.length == 0) {
+                this.parent.hasMoreChildren = false;
+                console.log("[" + this.formattedName() + "] parent set to no children");
+                console.log("[" + this.formattedName() + "] parent is " + this.parent.formattedName());
+            }
+            let tmp = await this.parent.nextLeafInner(lowRank, treeBase);
             return tmp;
         }
 
         treeBase.traversalPointer = this;
 
+        console.log("[" + this.formattedName() + "] fetch more data");
+
         let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.childrenData[this.childrenData.length - 1].id);
         let newChild = new Taxon (data.results[0], this);        
         this.children.push(newChild);
 
+        let tmp = await newChild.nextLeafInner(lowRank, treeBase);
+
         if (this.childrenData.length == 0) {
+            console.log("[" + this.formattedName() + "] finished with this taxon's children")
             this.hasMoreChildren = false;
         }
-        let tmp = await newChild.nextLeaf(lowRank, treeBase);
         return tmp;
     }
 
@@ -440,16 +452,16 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID);
 
     parentTaxon = new Taxon (data.results[0]);
-    let tmp = await parentTaxon.nextLeaf(20);
-    alert("final: " + tmp.name);
-    tmp = await parentTaxon.nextLeaf(20);
-    alert("final: " + tmp.name);
-    tmp = await parentTaxon.nextLeaf(20);
-    alert("final: " + tmp.name);
-    tmp = await parentTaxon.nextLeaf(20);
-    alert("final: " + tmp.name);
-    tmp = await parentTaxon.nextLeaf(20);
-    alert("final: " + tmp.name);
+    
+    for (let i = 0; i < 5; i++) { //just for testing
+        let tmp = await parentTaxon.nextLeaf(20);
+        if (tmp) {
+            console.log("final: " + tmp.name);
+        } else {
+            console.log("all trees found");
+        }
+    }
+
     curChildNum = -1;
     await loadNextChild(true)
 
