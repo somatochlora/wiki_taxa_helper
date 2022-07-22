@@ -1,44 +1,5 @@
 "use strict";
 
-// Number of photos to display at a time
-// This will also be the number of observations retrieved at one time
-const PHOTODISPLAYNUM = 20;
-
-// Milliseconds to wait after user stops typing to display autocomplete results. Necessarry to ensure we don't spam the api
-const AUTOCOMPLETEWAIT = 500;
-
-const TAXONOMYSTRUCTURE = ["kingdom", "phylum", "subphylum", "superclass", "class", "subclass", "superorder", "order", 
-"suborder", "infraorder", "superfamily", "epifamily", "family", "subfamily", "supertribe", "tribe", "subtribe", "genus", "subgenus", "section",
-"species", "subspecies", "variety", "form"];
-
-// All taxa with photos loaded, keyed by iNat ID [type: Taxon]
-let leaves = {};
-
-// The taxon selected from the search bar/autocomplete [type: Taxon]
-let parentTaxon;
-
-// Ordered list of ids for the children
-let childIds = [];
-
-// The current child that is being displayed with photos
-let curChildNum;
-
-// A promise that resolves when the next child is fully loaded
-let nextChildPromise;
-
-// A timer that resets any time there is input in the main search bar
-let inputWaitTimer;
-
-// Quick references for various html elements
-const parentInput = document.querySelector("#iNatTaxonID");
-const iNatPhotosDiv = document.querySelector('#inat-photos');
-const prevChildButton = document.querySelector('#prev-child');
-const nextChildButton = document.querySelector('#next-child');
-const prevPhotosButton = document.querySelector('#prev-photos');
-const nextPhotosButton = document.querySelector('#next-photos');
-const autocompleteResultsDiv = document.querySelector('#autocomplete-results');
-const photoModal = document.querySelector("#photo-modal");
-
 // Returns an object from the api when given the url
 async function getJSON(url) {
     const response = await fetch(url);
@@ -47,6 +8,31 @@ async function getJSON(url) {
 
     const data = response.json(); // get JSON from the response
     return data; // returns a promise, which resolves to this data value
+}
+
+class iNaturalistObjects {
+    constructor() {
+        this.length = 0;
+        this.ids = []
+    }
+
+    add(item) {
+        this[item.id] = item;
+        this.ids.push(item.id);
+        this.length += 1;
+    }
+
+    getByIndex(index) {
+        return this[this.ids[index]];
+    }
+
+    empty() {        
+        for (let i = 0; i < this.length; i++) {
+            delete this[this.ids[i]];
+        }
+        this.ids = [];
+        this.length = 0;
+    }
 }
 
 // Each photo returned from iNaturalist is an instance of this class
@@ -167,17 +153,17 @@ class Taxon {
     async nextLeafInner (lowRank, treeBase) {
 
         // case we have found a leaf
-        if (this.numericRank >= lowRank && !this.treeLoaded) {
+        if (this.numericRank >= lowRank && !(this.treeLoaded)) {
             console.log("[" + this.formattedName() + "] found leaf");
             if (this.parent) {
                 this.parent.childrenData.pop();
             }
-            this.treeLoaded == true;
+            this.treeLoaded = true;
             return this;
         }
 
         // case the parent taxon has no children or all children have been found
-        if (this == treeBase && !this.hasMoreChildren || this.treeloaded) {
+        if ((this == treeBase && !(this.hasMoreChildren)) || (this.treeLoaded)) {
             console.log("[" + this.formattedName() + "] finished!");
             return false;
         }        
@@ -344,10 +330,9 @@ async function loadNextChild(override = false) {
     // override is so we can use this function to load the very first child
     // the other two expressions check that (a) we are not already at the last child so no preloading necessary, and
     // (b) that the next child is not already loaded
-    if ((curChildNum != parentTaxon.childrenData.length - 1 && curChildNum == childIds.length - 1) || override) {
+    if ((curChildNum != parentTaxon.childrenData.length - 1 && curChildNum == leaves.length - 1) || override) {
         let curChild = new Taxon(parentTaxon.childrenData[curChildNum + 1]);
-        childIds.push(curChild.id);
-        leaves[childIds[curChildNum + 1]] = curChild;
+        leaves.add(curChild);
         await curChild.loadPhotos()
     }
     // Still throwing erros when a child taxon has no photos TODO
@@ -360,7 +345,7 @@ async function displayChild() {
     // starts preloading the next child
     nextChildPromise = loadNextChild();
 
-    let curChild = leaves[childIds[curChildNum]];
+    let curChild = leaves.getByIndex(curChildNum);
 
     let para = document.createElement('p');
 
@@ -394,8 +379,8 @@ async function displayChild() {
         nextPhotosButton.disabled = false;
     }
 
-    await leaves[childIds[curChildNum]].preloadPhotos()
-    if (!leaves[childIds[curChildNum]].onLastPage()) {
+    await leaves.getByIndex(curChildNum).preloadPhotos()
+    if (!leaves.getByIndex(curChildNum).onLastPage()) {
         nextPhotosButton.disabled = false;
     }
     if (curChild.photoPos > 0) {
@@ -435,6 +420,42 @@ function dropDownAutoComplete() {
     document.querySelector('#autocomplete-loading').innerHTML = "";
 }
 
+// Number of photos to display at a time
+// This will also be the number of observations retrieved at one time
+const PHOTODISPLAYNUM = 20;
+
+// Milliseconds to wait after user stops typing to display autocomplete results. Necessarry to ensure we don't spam the api
+const AUTOCOMPLETEWAIT = 500;
+
+const TAXONOMYSTRUCTURE = ["kingdom", "phylum", "subphylum", "superclass", "class", "subclass", "superorder", "order", 
+"suborder", "infraorder", "superfamily", "epifamily", "family", "subfamily", "supertribe", "tribe", "subtribe", "genus", "subgenus", "section",
+"species", "subspecies", "variety", "form"];
+
+// All taxa with photos loaded, keyed by iNat ID [type: Taxon]
+let leaves = new iNaturalistObjects;
+
+// The taxon selected from the search bar/autocomplete [type: Taxon]
+let parentTaxon;
+
+// The current child that is being displayed with photos
+let curChildNum;
+
+// A promise that resolves when the next child is fully loaded
+let nextChildPromise;
+
+// A timer that resets any time there is input in the main search bar
+let inputWaitTimer;
+
+// Quick references for various html elements
+const parentInput = document.querySelector("#iNatTaxonID");
+const iNatPhotosDiv = document.querySelector('#inat-photos');
+const prevChildButton = document.querySelector('#prev-child');
+const nextChildButton = document.querySelector('#next-child');
+const prevPhotosButton = document.querySelector('#prev-photos');
+const nextPhotosButton = document.querySelector('#next-photos');
+const autocompleteResultsDiv = document.querySelector('#autocomplete-results');
+const photoModal = document.querySelector("#photo-modal");
+
 parentInput.addEventListener('input', () => {
     document.querySelector('#autocomplete-loading').innerHTML = "loading...";
     clearTimeout(inputWaitTimer)
@@ -444,8 +465,7 @@ parentInput.addEventListener('input', () => {
 document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
     if (event.target.nodeName != 'BUTTON') return;
     document.querySelector('#photos-loading').innerHTML = "loading...";
-    leaves = {};
-    childIds = [];
+    leaves.empty();
     document.querySelector('#autocomplete-results').innerHTML = "";
 
     let taxonID = event.target.value;
@@ -453,6 +473,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
 
     parentTaxon = new Taxon (data.results[0]);
     
+    /*
     for (let i = 0; i < 5; i++) { //just for testing
         let tmp = await parentTaxon.nextLeaf(20);
         if (tmp) {
@@ -461,6 +482,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
             console.log("all trees found");
         }
     }
+    */
 
     curChildNum = -1;
     await loadNextChild(true)
@@ -502,16 +524,16 @@ prevChildButton.addEventListener('click', function() {
 nextPhotosButton.addEventListener('click', async function() {
 
     iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
-    iNatPhotosDiv.appendChild(children[childIds[curChildNum]].nextPhotos());
-    await leaves[childIds[curChildNum]].preloadPhotos()
-    if (!leaves[childIds[curChildNum]].onLastPage()) {
+    iNatPhotosDiv.appendChild(leaves.getByIndex(curChildNum).nextPhotos());
+    await leaves.getByIndex(curChildNum).preloadPhotos()
+    if (!leaves.getByIndex(curChildNum).onLastPage()) {
         nextPhotosButton.disabled = false;
     }
 });
 
 prevPhotosButton.addEventListener('click', async function() {
     iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
-    iNatPhotosDiv.appendChild(leaves[childIds[curChildNum]].prevPhotos());
+    iNatPhotosDiv.appendChild(leaves.getByIndex(curChildNum).prevPhotos());
 });
 
 document.querySelector('#inat-photos').addEventListener('click', function(event) {
@@ -523,7 +545,7 @@ document.querySelector('#inat-photos').addEventListener('click', function(event)
     } else {
         return;
     }
-    let curTaxon = leaves[childIds[curChildNum]];
+    let curTaxon = leaves.getByIndex(curChildNum);
     let curImg = curTaxon.photos[curImgId];
     let curObs = curImg.observationRef;
 
