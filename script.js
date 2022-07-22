@@ -147,7 +147,8 @@ class Taxon {
 
     async nextLeaf(lowRank) {
         console.log("[" + this.formattedName() + "] traversal pointer: " + this.traversalPointer.formattedName());
-        return this.traversalPointer.nextLeafInner(lowRank, this);        
+        let tmp = await this.traversalPointer.nextLeafInner(lowRank, this);     
+        return tmp;   
     }
 
     async nextLeafInner (lowRank, treeBase) {
@@ -330,13 +331,21 @@ async function loadNextChild(override = false) {
     // override is so we can use this function to load the very first child
     // the other two expressions check that (a) we are not already at the last child so no preloading necessary, and
     // (b) that the next child is not already loaded
-    if ((curChildNum != parentTaxon.childrenData.length - 1 && curChildNum == leaves.length - 1) || override) {
-        let curChild = new Taxon(parentTaxon.childrenData[curChildNum + 1]);
-        leaves.add(curChild);
-        await curChild.loadPhotos()
+    
+    //checks that we are not already on the last child
+    if (curLeafNum < leaves.length - 1 && !override) {
+        return false;
     }
-    // Still throwing erros when a child taxon has no photos TODO
-    return true;
+
+    let tmp = await parentTaxon.nextLeaf(20)
+
+    if(tmp) {
+        leaves.add(tmp);
+        await tmp.loadPhotos();
+        return true;
+    }
+    return false;
+
 }
 
 // displays the current child taxon and preloads the next
@@ -345,7 +354,8 @@ async function displayChild() {
     // starts preloading the next child
     nextChildPromise = loadNextChild();
 
-    let curChild = leaves.getByIndex(curChildNum);
+    console.log(curLeafNum);
+    let curChild = leaves.getByIndex(curLeafNum);
 
     let para = document.createElement('p');
 
@@ -356,22 +366,23 @@ async function displayChild() {
     iNatPhotosDiv.appendChild(curChild.makePhotos());
 
     // enables/disables the buttons for navigating between children as necessarry 
-    if (curChildNum == parentTaxon.childrenData.length - 1) {
-        nextChildButton.disabled = true;
-        nextChildButton.innerHTML = "last taxon";
-    } else {
-        // only enables the next child button when the next child is loaded
-        nextChildPromise.then(() => {
+    
+    nextChildPromise.then(() => {
+        if (curLeafNum == leaves.length - 1) {
+            nextChildButton.disabled = true;
+            nextChildButton.innerHTML = "last taxon";
+        } else {
             nextChildButton.disabled = false;
-            nextChildButton.innerHTML = parentTaxon.childrenData[curChildNum + 1].name + "  -->";
-        })              
-    }
-    if (curChildNum == 0) {
+            nextChildButton.innerHTML = leaves.getByIndex(curLeafNum + 1).name + "  -->";
+        }
+    });
+
+    if (curLeafNum == 0) {
         prevChildButton.disabled = true;
         prevChildButton.innerHTML = "first taxon";
     } else {   
         prevChildButton.disabled = false;
-        prevChildButton.innerHTML = "<--  " + parentTaxon.childrenData[curChildNum - 1].name;
+        prevChildButton.innerHTML = "<--  " + leaves.getByIndex(curLeafNum - 1).name;
     }
 
     // enables/disables the buttons for navigating between photos as necessarry 
@@ -379,8 +390,8 @@ async function displayChild() {
         nextPhotosButton.disabled = false;
     }
 
-    await leaves.getByIndex(curChildNum).preloadPhotos()
-    if (!leaves.getByIndex(curChildNum).onLastPage()) {
+    await leaves.getByIndex(curLeafNum).preloadPhotos()
+    if (!leaves.getByIndex(curLeafNum).onLastPage()) {
         nextPhotosButton.disabled = false;
     }
     if (curChild.photoPos > 0) {
@@ -438,7 +449,7 @@ let leaves = new iNaturalistObjects;
 let parentTaxon;
 
 // The current child that is being displayed with photos
-let curChildNum;
+let curLeafNum;
 
 // A promise that resolves when the next child is fully loaded
 let nextChildPromise;
@@ -484,10 +495,10 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     }
     */
 
-    curChildNum = -1;
+    curLeafNum = -1;
     await loadNextChild(true)
 
-    curChildNum = 0;
+    curLeafNum = 0;
     await displayChild()
     nextChildButton.hidden = false;
     prevChildButton.hidden = false;    
@@ -501,7 +512,7 @@ nextChildButton.addEventListener('click', async function() {
     nextPhotosButton.disabled = true;
     prevPhotosButton.disabled = true;
     await nextChildPromise;
-    curChildNum += 1;
+    curLeafNum += 1;
     
     await displayChild()
     .catch(error => {
@@ -514,7 +525,7 @@ prevChildButton.addEventListener('click', function() {
     prevChildButton.disabled = true;
     nextPhotosButton.disabled = true;
     prevPhotosButton.disabled = true;
-    curChildNum -= 1;
+    curLeafNum -= 1;
     displayChild()
     .catch(error => {
         alert("child api call error: " + error);
@@ -524,16 +535,16 @@ prevChildButton.addEventListener('click', function() {
 nextPhotosButton.addEventListener('click', async function() {
 
     iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
-    iNatPhotosDiv.appendChild(leaves.getByIndex(curChildNum).nextPhotos());
-    await leaves.getByIndex(curChildNum).preloadPhotos()
-    if (!leaves.getByIndex(curChildNum).onLastPage()) {
+    iNatPhotosDiv.appendChild(leaves.getByIndex(curLeafNum).nextPhotos());
+    await leaves.getByIndex(curLeafNum).preloadPhotos()
+    if (!leaves.getByIndex(curLeafNum).onLastPage()) {
         nextPhotosButton.disabled = false;
     }
 });
 
 prevPhotosButton.addEventListener('click', async function() {
     iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
-    iNatPhotosDiv.appendChild(leaves.getByIndex(curChildNum).prevPhotos());
+    iNatPhotosDiv.appendChild(leaves.getByIndex(curLeafNum).prevPhotos());
 });
 
 document.querySelector('#inat-photos').addEventListener('click', function(event) {
@@ -545,7 +556,7 @@ document.querySelector('#inat-photos').addEventListener('click', function(event)
     } else {
         return;
     }
-    let curTaxon = leaves.getByIndex(curChildNum);
+    let curTaxon = leaves.getByIndex(curLeafNum);
     let curImg = curTaxon.photos[curImgId];
     let curObs = curImg.observationRef;
 
