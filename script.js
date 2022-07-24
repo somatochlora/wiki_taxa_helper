@@ -109,6 +109,9 @@ class Taxon {
         this.id = taxonData.id;
         this.latinName = taxonData.name;
         this.rank = taxonData.rank
+
+        if (this.rank == "hybrid") this.rank = "species"; // this is a hacky fix need to make better
+        if (this.rank == "genushybrid") this.rank = "genus";
         this.numericRank = TAXONOMYSTRUCTURE.indexOf(this.rank);
 
         //array of child taxa
