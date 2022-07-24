@@ -117,7 +117,6 @@ class Taxon {
         this.hasMoreChildren = (this.childrenData != undefined);
         if (this.hasMoreChildren) {
             this.childrenNum = this.childrenData.length;
-            this.childrenData = this.childrenData.reverse();
         }
 
         this.commonName = taxonData.preferred_common_name;
@@ -144,60 +143,54 @@ class Taxon {
         this.traversalPointer = this;
     }
 
-
-    async nextLeaf(lowRank) {
-        console.log("[" + this.formattedName() + "] traversal pointer: " + this.traversalPointer.formattedName());
-        let tmp = await this.traversalPointer.nextLeafInner(lowRank, this);     
-        return tmp;   
-    }
-
-    async nextLeafInner (lowRank, treeBase) {
-
-        // case we have found a leaf
-        if (this.numericRank >= lowRank && !(this.treeLoaded)) {
-            console.log("[" + this.formattedName() + "] found leaf");
-            if (this.parent) {
-                this.parent.childrenData.pop();
+    async nextLeaf2(lowRank) {
+        let nextFound = false;
+        let result = 0;
+        for (let i = 0; i < MAXNUMBEROFSEARCHSTEPS; i++) {
+            console.log(this.traversalPointer.formattedName());
+            
+            // case found a leaf
+            if (this.traversalPointer.numericRank >= lowRank) {
+                              
+                if (nextFound) {
+                    console.log("found next leaf");
+                    return result;
+                } else {
+                    console.log("found this leaf");       
+                    result = this.traversalPointer;
+                    nextFound = true;  
+                    if (this.traversalPointer == this) {
+                        this.treeLoaded = true;
+                    } else {
+                        this.traversalPointer = this.traversalPointer.parent; 
+                    }                               
+                }
+            } else if (this.traversalPointer.childrenData.length > 0) { //case we need to move down a level
+                console.log("moving down a level");
+                let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.traversalPointer.childrenData[0].id);
+                let newChild = new Taxon (data.results[0], this.traversalPointer);        
+                this.traversalPointer.childrenData.shift();
+                this.traversalPointer = newChild;
+            } else { //case we need to move up a level
+                console.log("moving up a level");
+                
+                if (this.traversalPointer == this && this.childrenData.length == 0) {
+                    this.treeLoaded = true;
+                    return result;
+                }
+                this.traversalPointer = this.traversalPointer.parent;
             }
-            this.treeLoaded = true;
-            return this;
         }
 
-        // case the parent taxon has no children or all children have been found
-        if ((this == treeBase && !(this.hasMoreChildren)) || (this.treeLoaded)) {
-            console.log("[" + this.formattedName() + "] finished!");
-            return false;
-        }        
-
-        // case we are done with this node and need to move up a level        
-        if (this.hasMoreChildren == false) {
-            console.log("[" + this.formattedName() + "] time to move up a level");
-            treeBase.traversalPointer = this.parent;
-            this.parent.childrenData.pop();
-            if (this.parent.childrenData.length == 0) {
-                this.parent.hasMoreChildren = false;
-                console.log("[" + this.formattedName() + "] parent set to no children");
-                console.log("[" + this.formattedName() + "] parent is " + this.parent.formattedName());
-            }
-            let tmp = await this.parent.nextLeafInner(lowRank, treeBase);
-            return tmp;
+        // no leaves found after a limited number of searches
+        this.treeLoaded = true;
+        if (result === 0) {
+            console.log("no leaves found");
+            return -1;
         }
+        console.log("last leaf found");
+        return result;
 
-        treeBase.traversalPointer = this;
-
-        console.log("[" + this.formattedName() + "] fetch more data");
-
-        let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.childrenData[this.childrenData.length - 1].id);
-        let newChild = new Taxon (data.results[0], this);        
-        this.children.push(newChild);
-
-        let tmp = await newChild.nextLeafInner(lowRank, treeBase);
-
-        if (this.childrenData.length == 0) {
-            console.log("[" + this.formattedName() + "] finished with this taxon's children")
-            this.hasMoreChildren = false;
-        }
-        return tmp;
     }
 
     // a nicely formatted name to use in output
@@ -329,17 +322,17 @@ WHERE
 // preloads the next child taxa before it needs to be displayed
 async function loadNextChild(override = false) {
     // override is so we can use this function to load the very first child
-    // the other two expressions check that (a) we are not already at the last child so no preloading necessary, and
-    // (b) that the next child is not already loaded
-    
+
     //checks that we are not already on the last child
-    if (curLeafNum < leaves.length - 1 && !override) {
+    if ((curLeafNum < leaves.length - 1 && !override) || (parentTaxon.treeLoaded)) {
+        console.log("next child not being loaded");
         return false;
     }
 
-    let tmp = await parentTaxon.nextLeaf(20)
+    console.log("next child being loaded");
+    let tmp = await parentTaxon.nextLeaf2(20)
 
-    if(tmp) {
+    if(tmp !== -1) {
         leaves.add(tmp);
         await tmp.loadPhotos();
         return true;
@@ -441,6 +434,8 @@ const AUTOCOMPLETEWAIT = 500;
 const TAXONOMYSTRUCTURE = ["kingdom", "phylum", "subphylum", "superclass", "class", "subclass", "superorder", "order", 
 "suborder", "infraorder", "superfamily", "epifamily", "family", "subfamily", "supertribe", "tribe", "subtribe", "genus", "subgenus", "section",
 "species", "subspecies", "variety", "form"];
+
+const MAXNUMBEROFSEARCHSTEPS = 20;
 
 // All taxa with photos loaded, keyed by iNat ID [type: Taxon]
 let leaves = new iNaturalistObjects;
