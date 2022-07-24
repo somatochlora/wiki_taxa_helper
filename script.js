@@ -473,6 +473,12 @@ parentInput.addEventListener('input', () => {
 
 document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
     if (event.target.nodeName != 'BUTTON') return;
+
+    nextChildButton.disabled = true;
+    prevChildButton.disabled = true;    
+    nextPhotosButton.disabled = true;
+    prevPhotosButton.disabled = true;
+
     document.querySelector('#photos-loading').innerHTML = "loading...";
     leaves.empty();
     document.querySelector('#autocomplete-results').innerHTML = "";
