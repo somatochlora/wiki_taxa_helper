@@ -49,6 +49,8 @@ class Photo {
         // iNat id of the observation this photo belongs to
         this.observationId = observationData.id;
 
+        this.observationRef = observationRef;
+
         // research grade, needs id, or casual
         this.qualityGrade = observationData.quality_grade;
 
@@ -64,6 +66,10 @@ class Photo {
                 return true;
         }
         return false;
+    }
+
+    getTaxonName() {
+        return this.observationRef.taxonName;
     }
 
     // returns a formatted html element for the photo
@@ -125,7 +131,7 @@ class Taxon {
         this.commonName = taxonData.preferred_common_name;
         this.hasCommonName = (this.commonName != undefined);
 
-        this.observations = [];
+        this.observations = new iNaturalistObjects;
         this.photos = {};
         this.photoIds = [];
 
@@ -233,10 +239,13 @@ class Taxon {
             }
             newObs.location = observation.location;
 
-            this.observations.push(newObs);
+            let tmp = new Taxon(observation.taxon);
+            newObs.taxonName = tmp.formattedName();
+
+            this.observations.add(newObs);
         };
 
-        this.curMaxId = this.observations[this.observations.length - 1].id;
+        this.curMaxId = this.observations.getByIndex(this.observations.length - 1).id;
     }
 
     // Will do an api call to retrieve the next set of observations with freely licensed photos
@@ -577,7 +586,7 @@ document.querySelector('#inat-photos').addEventListener('click', function(event)
 
     document.querySelector('#photo-modal-text').innerHTML = "";
     let paras = [];
-    paras.push(curTaxon.formattedName());
+    paras.push(curImg.getTaxonName());
     paras.push(curObs.location);
     paras.push(curObs.datetime);
     paras.push(curImg.attribution);
