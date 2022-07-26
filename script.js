@@ -333,7 +333,7 @@ async function loadNextChild(override = false) {
     }
 
     console.log("next child being loaded");
-    let tmp = await parentTaxon.nextLeaf2(20)
+    let tmp = await parentTaxon.nextLeaf2(targetRank);
 
     if(tmp !== -1) {
         leaves.add(tmp);
@@ -465,6 +465,22 @@ const nextPhotosButton = document.querySelector('#next-photos');
 const autocompleteResultsDiv = document.querySelector('#autocomplete-results');
 const photoModal = document.querySelector("#photo-modal");
 
+let targetRank = TAXONOMYSTRUCTURE.indexOf("species");
+
+let rankDropDown = document.querySelector("#rank");
+    for (let rank of TAXONOMYSTRUCTURE) {
+        let item = document.createElement("option");
+        item.value = rank;
+        item.innerHTML = rank;
+        if (rank == "species") item.selected = true;
+        rankDropDown.appendChild(item)
+    }
+rankDropDown.hidden = false;
+
+rankDropDown.addEventListener('change', () => {
+    targetRank = TAXONOMYSTRUCTURE.indexOf(rankDropDown.value);
+});
+
 parentInput.addEventListener('input', () => {
     document.querySelector('#autocomplete-loading').innerHTML = "loading...";
     clearTimeout(inputWaitTimer)
@@ -488,17 +504,6 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
 
     parentTaxon = new Taxon (data.results[0]);
     
-    /*
-    for (let i = 0; i < 5; i++) { //just for testing
-        let tmp = await parentTaxon.nextLeaf(20);
-        if (tmp) {
-            console.log("final: " + tmp.name);
-        } else {
-            console.log("all trees found");
-        }
-    }
-    */
-
     curLeafNum = -1;
     await loadNextChild(true)
 
