@@ -108,6 +108,26 @@ class Photo {
 
 }
 
+class GenericTaxon {
+    constructor (latinName, commonName, rank) {
+        this.latinName = latinName;
+        this.commonName = commonName;
+        if (this.commonName) this.hasCommonName = true;
+        this.rank = rank;
+    }
+
+    formattedName() {
+        let latinName = this.latinName;
+        if (this.rank == "species" || this.rank == "genus" || this.rank == "subspecies") {
+            latinName = "<i>" + latinName + "</i>";
+        }
+        if (this.hasCommonName) {
+            return this.commonName + " (" + latinName + ") ";
+        }
+        return latinName;
+    }
+}
+
 // various methods for interacting with taxa returned from iNat
 class Taxon {
     constructor(taxonData, parent = false) {
@@ -131,7 +151,7 @@ class Taxon {
         this.commonName = taxonData.preferred_common_name;
         this.hasCommonName = (this.commonName != undefined);
 
-        this.observations = new iNaturalistObjects;
+        this.observations = new iNaturalistObjects();
         this.photos = {};
         this.photoIds = [];
 
@@ -149,7 +169,9 @@ class Taxon {
 
         this.treeLoaded = false;
         this.parent = parent;
+        
         this.traversalPointer = this;
+        this.wikidataIDLoaded = this.getWikidataId();
     }
 
     async nextLeaf2(lowRank) {
@@ -268,6 +290,8 @@ WHERE
 }`;
         const data = await getJSON('https://query.wikidata.org/sparql?query=' + encodeURIComponent(sparqlQuery) + '&format=json');
         this.wikidataID = data?.results?.bindings[0]?.item?.value;
+        console.log(this.wikidataID);
+        return true;
     }
     
     // load the first set of photos
@@ -342,6 +366,7 @@ async function loadNextChild(override = false) {
     }
 
     console.log("next child being loaded");
+    console.log(parentTaxon.formattedName());
     let tmp = await parentTaxon.nextLeaf2(targetRank);
 
     if(tmp !== -1) {
@@ -384,7 +409,7 @@ async function displayChild() {
 
     if (curLeafNum == 0) {
         prevChildButton.disabled = true;
-        prevChildButton.innerHTML = "first taxon";
+        prevChildButton.innerHTML = "first taxon" ;
     } else {   
         prevChildButton.disabled = false;
         prevChildButton.innerHTML = "<--  " + leaves.getByIndex(curLeafNum - 1).name;
@@ -403,6 +428,9 @@ async function displayChild() {
         prevPhotosButton.disabled = false;
     }
     document.querySelector("#photos-loading").innerHTML = "";
+
+    //await curChild.wikidataIDLoaded;
+    document.querySelector("#wikidata").innerHTML = "Wikidata ID: " + curChild.wikidataID;
 }
 
 // creatse the html for the autocomplete results
