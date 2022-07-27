@@ -112,7 +112,7 @@ class GenericTaxon {
     constructor (latinName, commonName, rank) {
         this.latinName = latinName;
         this.commonName = commonName;
-        if (this.commonName) this.hasCommonName = true;
+        this.hasCommonName = (this.commonName != undefined);
         this.rank = rank;
     }
 
@@ -125,6 +125,96 @@ class GenericTaxon {
             return this.commonName + " (" + latinName + ") ";
         }
         return latinName;
+    }
+}
+
+class iNatTaxon extends GenericTaxon {
+    constructor(taxonData) {
+        super(taxonData.name, taxonData.preferred_common_name, taxonData.rank);
+        if (this.rank == "hybrid") this.rank = "species"; // this is a hacky fix need to make better
+        if (this.rank == "genushybrid") this.rank = "genus";
+        this.numericRank = TAXONOMYSTRUCTURE.indexOf(this.rank);
+    }
+}
+
+class ParentiNatTaxon extends iNatTaxon {
+    constructor(taxonData, parent = false) {
+        super(taxonData);
+        this.childrenData = taxonData.children;
+        this.children = [];
+        this.hasMoreChildren = (this.childrenData != undefined);
+        if (this.hasMoreChildren) {
+            this.childrenNum = this.childrenData.length;
+        }
+
+        this.treeLoaded = false;
+        this.parent = parent;        
+        this.traversalPointer = this;
+    }
+
+    async nextLeaf2(lowRank) {
+        let nextFound = false;
+        let result = 0;
+        for (let i = 0; i < MAXNUMBEROFSEARCHSTEPS; i++) {
+            console.log(this.traversalPointer.formattedName());
+            
+            // case found a leaf
+            if (this.traversalPointer.numericRank >= lowRank) {
+                              
+                if (nextFound) {
+                    console.log("found next leaf");
+                    return result;
+                } else {
+                    console.log("found this leaf");       
+                    result = this.traversalPointer;
+                    nextFound = true;  
+                    if (this.traversalPointer == this) {
+                        this.treeLoaded = true;
+                    } else {
+                        this.traversalPointer = this.traversalPointer.parent; 
+                    }                               
+                }
+            } else if (this.traversalPointer.childrenData.length > 0) { //case we need to move down a level
+                console.log("moving down a level");
+                let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.traversalPointer.childrenData[0].id);
+                let newChild = new ParentiNatTaxon (data.results[0], this.traversalPointer);        
+                this.traversalPointer.childrenData.shift();
+                this.traversalPointer = newChild;
+            } else { //case we need to move up a level
+                console.log("moving up a level");
+                
+                if (this.traversalPointer == this && this.childrenData.length == 0) {
+                    this.treeLoaded = true;
+                    return result;
+                }
+                this.traversalPointer = this.traversalPointer.parent;
+            }
+        }
+
+        // no leaves found after a limited number of searches
+        this.treeLoaded = true;
+        if (result === 0) {
+            console.log("no leaves found");
+            return -1;
+        }
+        console.log("last leaf found");
+        return result;
+
+    }
+}
+
+class PhotoiNatTaxon extends iNatTaxon {
+    constructor(taxonData) {
+        this.observations = new iNaturalistObjects();
+        this.photos = {};
+        this.photoIds = [];
+
+        // index of the first photo currently displayed
+        this.photoPos = 0;
+
+        // the smallest ID of all observations currently loaded, used for pagination
+        this.curMaxId = -1;
+        this.photosLoaded = false;
     }
 }
 
