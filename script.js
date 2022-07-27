@@ -134,6 +134,7 @@ class iNatTaxon extends GenericTaxon {
         if (this.rank == "hybrid") this.rank = "species"; // this is a hacky fix need to make better
         if (this.rank == "genushybrid") this.rank = "genus";
         this.numericRank = TAXONOMYSTRUCTURE.indexOf(this.rank);
+        this.id = taxonData.id;
     }
 }
 
@@ -150,11 +151,15 @@ class ParentiNatTaxon extends iNatTaxon {
         this.treeLoaded = false;
         this.parent = parent;        
         this.traversalPointer = this;
+
+        this.taxonData = taxonData;
     }
 
     async nextLeaf2(lowRank) {
         let nextFound = false;
         let result = 0;
+        let taxonData = this.traversalPointer.taxonData;
+
         for (let i = 0; i < MAXNUMBEROFSEARCHSTEPS; i++) {
             console.log(this.traversalPointer.formattedName());
             
@@ -166,7 +171,7 @@ class ParentiNatTaxon extends iNatTaxon {
                     return result;
                 } else {
                     console.log("found this leaf");       
-                    result = this.traversalPointer;
+                    result = new PhotoiNatTaxon(this.traversalPointer, true);
                     nextFound = true;  
                     if (this.traversalPointer == this) {
                         this.treeLoaded = true;
@@ -176,8 +181,8 @@ class ParentiNatTaxon extends iNatTaxon {
                 }
             } else if (this.traversalPointer.childrenData.length > 0) { //case we need to move down a level
                 console.log("moving down a level");
-                let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.traversalPointer.childrenData[0].id);
-                let newChild = new ParentiNatTaxon (data.results[0], this.traversalPointer);        
+                taxonData = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.traversalPointer.childrenData[0].id);
+                let newChild = new ParentiNatTaxon (taxonData.results[0], this.traversalPointer);        
                 this.traversalPointer.childrenData.shift();
                 this.traversalPointer = newChild;
             } else { //case we need to move up a level
@@ -204,7 +209,14 @@ class ParentiNatTaxon extends iNatTaxon {
 }
 
 class PhotoiNatTaxon extends iNatTaxon {
-    constructor(taxonData) {
+    constructor(taxonData, override) {
+        if (override) {
+            let objectPass = {name: taxonData.latinName, preferred_common_name: taxonData.commonName,
+            rank: taxonData.rank, id: taxonData.id};
+            super (objectPass);
+        } else {
+            super (taxonData);
+        }        
         this.observations = new iNaturalistObjects();
         this.photos = {};
         this.photoIds = [];
@@ -215,115 +227,9 @@ class PhotoiNatTaxon extends iNatTaxon {
         // the smallest ID of all observations currently loaded, used for pagination
         this.curMaxId = -1;
         this.photosLoaded = false;
-    }
-}
 
-// various methods for interacting with taxa returned from iNat
-class Taxon {
-    constructor(taxonData, parent = false) {
-        // unique iNaturalist id
-        this.id = taxonData.id;
-        this.latinName = taxonData.name;
-        this.rank = taxonData.rank
-
-        if (this.rank == "hybrid") this.rank = "species"; // this is a hacky fix need to make better
-        if (this.rank == "genushybrid") this.rank = "genus";
-        this.numericRank = TAXONOMYSTRUCTURE.indexOf(this.rank);
-
-        //array of child taxa
-        this.childrenData = taxonData.children;
-        this.children = [];
-        this.hasMoreChildren = (this.childrenData != undefined);
-        if (this.hasMoreChildren) {
-            this.childrenNum = this.childrenData.length;
-        }
-
-        this.commonName = taxonData.preferred_common_name;
-        this.hasCommonName = (this.commonName != undefined);
-
-        this.observations = new iNaturalistObjects();
-        this.photos = {};
-        this.photoIds = [];
-
-        // index of the first photo currently displayed
-        this.photoPos = 0;
-
-        // the smallest ID of all observations currently loaded, used for pagination
-        this.curMaxId = -1;
-
-        if (this.hasCommonName) this.name = this.commonName;
-        else this.name = this.latinName;
-
-        // true when every observation and photo has been loaded
-        this.photosLoaded = false;
-
-        this.treeLoaded = false;
-        this.parent = parent;
-        
-        this.traversalPointer = this;
         this.wikidataIDLoaded = this.getWikidataId();
-    }
-
-    async nextLeaf2(lowRank) {
-        let nextFound = false;
-        let result = 0;
-        for (let i = 0; i < MAXNUMBEROFSEARCHSTEPS; i++) {
-            console.log(this.traversalPointer.formattedName());
-            
-            // case found a leaf
-            if (this.traversalPointer.numericRank >= lowRank) {
-                              
-                if (nextFound) {
-                    console.log("found next leaf");
-                    return result;
-                } else {
-                    console.log("found this leaf");       
-                    result = this.traversalPointer;
-                    nextFound = true;  
-                    if (this.traversalPointer == this) {
-                        this.treeLoaded = true;
-                    } else {
-                        this.traversalPointer = this.traversalPointer.parent; 
-                    }                               
-                }
-            } else if (this.traversalPointer.childrenData.length > 0) { //case we need to move down a level
-                console.log("moving down a level");
-                let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.traversalPointer.childrenData[0].id);
-                let newChild = new Taxon (data.results[0], this.traversalPointer);        
-                this.traversalPointer.childrenData.shift();
-                this.traversalPointer = newChild;
-            } else { //case we need to move up a level
-                console.log("moving up a level");
-                
-                if (this.traversalPointer == this && this.childrenData.length == 0) {
-                    this.treeLoaded = true;
-                    return result;
-                }
-                this.traversalPointer = this.traversalPointer.parent;
-            }
-        }
-
-        // no leaves found after a limited number of searches
-        this.treeLoaded = true;
-        if (result === 0) {
-            console.log("no leaves found");
-            return -1;
-        }
-        console.log("last leaf found");
-        return result;
-
-    }
-
-    // a nicely formatted name to use in output
-    formattedName() {
-        let latinName = this.latinName;
-        if (this.rank == "species" || this.rank == "genus" || this.rank == "subspecies") {
-            latinName = "<i>" + latinName + "</i>";
-        }
-        if (this.hasCommonName) {
-            return this.commonName + " (" + latinName + ") ";
-        }
-        return latinName;
+        
     }
 
     // loads all the observations and photos from a single api call
@@ -351,7 +257,7 @@ class Taxon {
             }
             newObs.location = observation.location;
 
-            let tmp = new Taxon(observation.taxon);
+            let tmp = new iNatTaxon(observation.taxon);
             newObs.taxonName = tmp.formattedName();
 
             this.observations.add(newObs);
@@ -442,7 +348,6 @@ WHERE
         }
         return false;
     }
-
 }
 
 // preloads the next child taxa before it needs to be displayed
@@ -479,7 +384,7 @@ async function displayChild() {
 
     let para = document.createElement('p');
 
-    para.textContent = curChild.name + ": " + curChild.observationCount + " observations with licensed photos";
+    para.innerHTML = curChild.formattedName() + ": " + curChild.observationCount + " observations with licensed photos";
 
     iNatPhotosDiv.innerHTML = "";
     iNatPhotosDiv.appendChild(para);
@@ -493,7 +398,7 @@ async function displayChild() {
             nextChildButton.innerHTML = "last taxon";
         } else {
             nextChildButton.disabled = false;
-            nextChildButton.innerHTML = leaves.getByIndex(curLeafNum + 1).name + "  -->";
+            nextChildButton.innerHTML = leaves.getByIndex(curLeafNum + 1).formattedName() + "  -->";
         }
     });
 
@@ -502,7 +407,7 @@ async function displayChild() {
         prevChildButton.innerHTML = "first taxon" ;
     } else {   
         prevChildButton.disabled = false;
-        prevChildButton.innerHTML = "<--  " + leaves.getByIndex(curLeafNum - 1).name;
+        prevChildButton.innerHTML = "<--  " + leaves.getByIndex(curLeafNum - 1).formattedName();
     }
 
     // enables/disables the buttons for navigating between photos as necessarry 
@@ -532,7 +437,7 @@ async function iNatAutoCompleteMake() {
     let autoCompleteList = document.createElement("ul");
 
     for (let i = 0; i < n; i++) {
-        let curTax = new Taxon(results.results[i]);
+        let curTax = new iNatTaxon(results.results[i]);
 
         let item = document.createElement("li");
         item.innerHTML = curTax.formattedName();
@@ -629,7 +534,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     let taxonID = event.target.value;
     let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID);
 
-    parentTaxon = new Taxon (data.results[0]);
+    parentTaxon = new ParentiNatTaxon (data.results[0]);
     
     curLeafNum = -1;
     await loadNextChild(true)
