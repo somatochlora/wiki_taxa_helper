@@ -284,11 +284,22 @@ WHERE
 {
 ?item wdt:P3151 "` + this.id + `".
 }`;
-        const data = await getJSON('https://query.wikidata.org/sparql?query=' + encodeURIComponent(sparqlQuery) + '&format=json');
-        this.wikidataID = data?.results?.bindings[0]?.item?.value;
+        const data = await getJSON('https://query.wikidata.org/sparql?query=' + encodeURIComponent(sparqlQuery) + '&format=json&origin=*');
+        let idString = data?.results?.bindings[0]?.item?.value;
+        if (idString) {
+            this.wikidataID = idString.slice(idString.indexOf("Q"));
+            //let tmp = await getWikidataItem(this.wikidataID);
+            //console.log(tmp);
+        } else {
+            this.wikidataID = "taxon not found";
+            
+        }        
         console.log(this.wikidataID);
+        
         return true;
     }
+
+
     
     // load the first set of photos
     async loadPhotos () {
@@ -459,6 +470,31 @@ function dropDownAutoComplete() {
     document.querySelector('#autocomplete-loading').innerHTML = "";
 }
 
+async function getWikidataItem (id) {
+    let data = await getJSON ("https://wikidata.org/wiki/Special:EntityData/" + id + ".json?origin=*");
+    console.log(data);
+    return data;
+}
+
+async function wikidataQuery (taxon, url = false) {
+    let insert1 = "";
+    let insert2 = "";
+    if (url) {
+        insert1 = ' ?article ';
+        insert2 = `?article schema:about ?taxon .
+?article schema:isPartOf <` + url + '> .';
+    }
+    let query = `SELECT ?taxon` + insert1 + `WHERE
+{
+?taxon wdt:P3151 "` + taxon + `".
+` + insert2 + `
+}`;
+    const data = await getJSON('https://query.wikidata.org/sparql?query=' + encodeURIComponent(query) + '&format=json&origin=*');
+    console.log(data);
+
+}
+
+
 // Number of photos to display at a time
 // This will also be the number of observations retrieved at one time
 const PHOTODISPLAYNUM = 20;
@@ -544,7 +580,10 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     nextChildButton.hidden = false;
     prevChildButton.hidden = false;    
     nextPhotosButton.hidden = false;
-    prevPhotosButton.hidden = false;  
+    prevPhotosButton.hidden = false; 
+    
+    wikidataQuery(199841);
+    wikidataQuery(199841, "https://commons.wikimedia.org/");
     
 });
 
