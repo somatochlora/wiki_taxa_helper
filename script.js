@@ -227,8 +227,6 @@ class PhotoiNatTaxon extends iNatTaxon {
         // the smallest ID of all observations currently loaded, used for pagination
         this.curMaxId = -1;
         this.photosLoaded = false;
-
-        this.wikidataIDLoaded = this.getWikidataId();
         
     }
 
@@ -278,28 +276,36 @@ class PhotoiNatTaxon extends iNatTaxon {
     }
 
     // will return the wikidata id for the taxon if available
-    async getWikidataId () {
-        const sparqlQuery = `SELECT ?item
-WHERE
-{
-?item wdt:P3151 "` + this.id + `".
-}`;
-        const data = await getJSON('https://query.wikidata.org/sparql?query=' + encodeURIComponent(sparqlQuery) + '&format=json&origin=*');
-        let idString = data?.results?.bindings[0]?.item?.value;
-        if (idString) {
-            this.wikidataID = idString.slice(idString.indexOf("Q"));
-            //let tmp = await getWikidataItem(this.wikidataID);
-            //console.log(tmp);
+    async loadWikidata () {
+        if ("wikidataID" in this) {
+            return;
+        }
+        let results = await wikidataQuery(this.id);
+        if (results.results.bindings.length === 0) {
+            this.wikidataId = false;
+            this.commonsURL = false;
+            this.wikiURL = false;
         } else {
-            this.wikidataID = "taxon not found";
-            
-        }        
-        console.log(this.wikidataID);
-        
-        return true;
+            this.wikidataId = results.results.bindings[0].taxon.value;
+            this.wikidataId = this.wikidataId.slice(this.wikidataId.indexOf("Q"));
+
+            let commonsResults = await wikidataQuery(this.id, "https://commons.wikimedia.org/");
+            let wikiResults = await wikidataQuery(this.id, "https://en.wikipedia.org/");
+
+            console.log(commonsResults);
+            if (commonsResults.results.bindings.length === 0) {
+                this.commonsURL = false;
+            } else {
+                this.commonsURL = commonsResults.results.bindings[0].article.value;
+            }
+
+            if (wikiResults.results.bindings.length === 0) {
+                this.wikiURL = false;
+            } else {
+                this.wikiURL = wikiResults.results.bindings[0].article.value;
+            }
+        }   
     }
-
-
     
     // load the first set of photos
     async loadPhotos () {
@@ -393,6 +399,8 @@ async function displayChild() {
     console.log(curLeafNum);
     let curChild = leaves.getByIndex(curLeafNum);
 
+    let wikidataLoaded = curChild.loadWikidata();
+
     let para = document.createElement('p');
 
     para.innerHTML = curChild.formattedName() + ": " + curChild.observationCount + " observations with licensed photos";
@@ -435,8 +443,26 @@ async function displayChild() {
     }
     document.querySelector("#photos-loading").innerHTML = "";
 
-    //await curChild.wikidataIDLoaded;
-    document.querySelector("#wikidata").innerHTML = "Wikidata ID: " + curChild.wikidataID;
+    await wikidataLoaded;
+    if (!curChild.wikidataId) {
+        document.querySelector("#wikidata-id").innerHTML = "no Wikidata connection found";
+        document.querySelector("#commons-url").innerHTML = "";
+        document.querySelector("#wikipedia-url").innerHTML = "";
+
+    } else {
+        document.querySelector("#wikidata-id").innerHTML = "Wikidata ID: " + curChild.wikidataId;
+        if (!curChild.commonsURL) {
+            document.querySelector("#commons-url").innerHTML = "no Commons page found";
+        } else {
+            document.querySelector("#commons-url").innerHTML = "Commons page: " + curChild.commonsURL;
+        }
+        if (!curChild.wikiURL) {
+            document.querySelector("#wikipedia-url").innerHTML = "no English Wikipedia page found";
+        } else {
+            document.querySelector("#wikipedia-url").innerHTML = "English Wikipedia page: " + curChild.wikiURL;
+        }
+    }
+
 }
 
 // creatse the html for the autocomplete results
@@ -470,12 +496,6 @@ function dropDownAutoComplete() {
     document.querySelector('#autocomplete-loading').innerHTML = "";
 }
 
-async function getWikidataItem (id) {
-    let data = await getJSON ("https://wikidata.org/wiki/Special:EntityData/" + id + ".json?origin=*");
-    console.log(data);
-    return data;
-}
-
 async function wikidataQuery (taxon, url = false) {
     let insert1 = "";
     let insert2 = "";
@@ -484,14 +504,13 @@ async function wikidataQuery (taxon, url = false) {
         insert2 = `?article schema:about ?taxon .
 ?article schema:isPartOf <` + url + '> .';
     }
-    let query = `SELECT ?taxon` + insert1 + `WHERE
+    let query = `SELECT ?taxon` + insert1 + ` WHERE
 {
 ?taxon wdt:P3151 "` + taxon + `".
 ` + insert2 + `
 }`;
     const data = await getJSON('https://query.wikidata.org/sparql?query=' + encodeURIComponent(query) + '&format=json&origin=*');
-    console.log(data);
-
+    return data;
 }
 
 
@@ -582,8 +601,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     nextPhotosButton.hidden = false;
     prevPhotosButton.hidden = false; 
     
-    wikidataQuery(199841);
-    wikidataQuery(199841, "https://commons.wikimedia.org/");
+    
     
 });
 
