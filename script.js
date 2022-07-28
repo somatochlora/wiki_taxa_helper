@@ -285,6 +285,11 @@ class PhotoiNatTaxon extends iNatTaxon {
             this.wikidataId = false;
             this.commonsURL = false;
             this.wikiURL = false;
+            /* TODO
+            let searchResults = await getJSON("https://www.wikidata.org/w/api.php?action=query&list=search&format=json&origin=*&srsearch=" + encodeURIComponent(this.latinName));
+            searchResults = searchResults.query.search;
+            console.log(searchResults);
+            */
         } else {
             this.wikidataId = results.results.bindings[0].taxon.value;
             this.wikidataId = this.wikidataId.slice(this.wikidataId.indexOf("Q"));
@@ -292,18 +297,22 @@ class PhotoiNatTaxon extends iNatTaxon {
             let commonsResults = await wikidataQuery(this.id, "https://commons.wikimedia.org/");
             let wikiResults = await wikidataQuery(this.id, "https://en.wikipedia.org/");
 
-            console.log(commonsResults);
             if (commonsResults.results.bindings.length === 0) {
                 this.commonsURL = false;
             } else {
                 this.commonsURL = commonsResults.results.bindings[0].article.value;
             }
+            if (this.commonsURL.indexOf("Category") == -1) {
+                this.commonsURL = this.commonsURL.replace("wiki/", "wiki/Category:");
+            }
+            this.commonsPage = this.commonsURL.replace("https://commons.wikimedia.org/wiki/", "");
 
             if (wikiResults.results.bindings.length === 0) {
                 this.wikiURL = false;
             } else {
                 this.wikiURL = wikiResults.results.bindings[0].article.value;
             }
+            this.wikiPage = this.wikiURL.replace("https://en.wikipedia.org/wiki/", "");
         }   
     }
     
@@ -454,12 +463,22 @@ async function displayChild() {
         if (!curChild.commonsURL) {
             document.querySelector("#commons-url").innerHTML = "no Commons page found";
         } else {
-            document.querySelector("#commons-url").innerHTML = "Commons page: " + curChild.commonsURL;
+            let link = document.createElement("a");
+            link.href = curChild.commonsURL;
+            link.target = "_blank";
+            link.innerHTML = curChild.commonsPage;
+            document.querySelector("#commons-url").innerHTML = "Commons page: ";
+            document.querySelector("#commons-url").appendChild(link);
         }
         if (!curChild.wikiURL) {
             document.querySelector("#wikipedia-url").innerHTML = "no English Wikipedia page found";
         } else {
-            document.querySelector("#wikipedia-url").innerHTML = "English Wikipedia page: " + curChild.wikiURL;
+            let link = document.createElement("a");
+            link.href = curChild.wikiURL;
+            link.target = "_blank";
+            link.innerHTML = curChild.wikiPage;
+            document.querySelector("#wikipedia-url").innerHTML = "English Wikipedia page: ";
+            document.querySelector("#wikipedia-url").appendChild(link);
         }
     }
 
