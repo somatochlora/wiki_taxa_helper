@@ -120,6 +120,19 @@ class CommonsPhoto extends Photo {
         this.commonsPage = commonsPage;
         this.buttonValue = commonsPage;
     }
+
+    isPhoto() {
+        let filetype = this.commonsPage.slice(this.commonsPage.lastIndexOf(".")).toLowerCase();
+        console.log(filetype);
+        switch (filetype) {
+            case ".jpg":
+            case ".jpeg":
+            case ".png":
+            case ".gif":
+                return true;
+        }
+        return false;
+    }
 }
 
 class GenericTaxon {
@@ -422,8 +435,10 @@ async function loadNextChild(override = false) {
 // displays the current child taxon and preloads the next
 async function displayChild() {
     
+    hideAllSections();
     // starts preloading the next child
     nextChildPromise = loadNextChild();
+
 
     console.log(curLeafNum);
     let curChild = leaves.getByIndex(curLeafNum);
@@ -471,7 +486,9 @@ async function displayChild() {
         prevPhotosButton.disabled = false;
     }
     document.querySelector("#photos-loading").innerHTML = "";
+    document.querySelector("#inat-photos").hidden = false;
 
+    document.querySelector("#commons-photos").innerHTML = "";
     await wikidataLoaded;
     if (!curChild.wikidataId) {
         document.querySelector("#wikidata-id").innerHTML = "no Wikidata connection found";
@@ -492,7 +509,9 @@ async function displayChild() {
             if (curChild.commonsPhotoData?.query?.categorymembers.length > 0) {
                 for (let photo of curChild.commonsPhotoData.query.categorymembers) {
                     let curPhoto = new CommonsPhoto(photo.title);
-                    document.querySelector("#commons-url").appendChild(curPhoto.returnDiv());
+                    if (curPhoto.isPhoto()) {
+                        document.querySelector("#commons-photos").appendChild(curPhoto.returnDiv());
+                    }
                 }
             }
             
@@ -509,9 +528,7 @@ async function displayChild() {
             document.querySelector("#wikipedia-url").appendChild(link);
         }
     }
-
-
-
+    document.querySelector("#wikidata").hidden = false;
 }
 
 // creatse the html for the autocomplete results
@@ -538,6 +555,7 @@ async function iNatAutoCompleteMake() {
     }
     autocompleteResultsDiv.innerHTML = "";
     autocompleteResultsDiv.appendChild(autoCompleteList);
+    autocompleteResultsDiv.hidden=false;
 }
 
 function dropDownAutoComplete() {
@@ -560,6 +578,12 @@ async function wikidataQuery (taxon, url = false) {
 }`;
     const data = await getJSON('https://query.wikidata.org/sparql?query=' + encodeURIComponent(query) + '&format=json&origin=*');
     return data;
+}
+
+function hideAllSections () {
+    document.querySelector("#autocomplete-results").hidden = true;
+    document.querySelector("#inat-photos").hidden = true;
+    document.querySelector("#wikidata").hidden = true;
 }
 
 

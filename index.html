@@ -10,7 +10,7 @@
         <input type = "text" placeholder = "taxon name" id = "iNatTaxonID">
         <select name = "rank" id = "rank" hidden></select>
         <p id="autocomplete-loading"></p>
-        <div id = "autocomplete-results"></div>
+        <div id = "autocomplete-results" hidden></div>
         <p></p>
         <button type = "button" id = "prev-child" hidden disabled>previous taxon</button>
         <button type = "button" id = "next-child" hidden disabled>next taxon</button>
@@ -18,11 +18,12 @@
         <button type = "button" id = "prev-photos" hidden disabled>previous photos</button>
         <button type = "button" id = "next-photos" hidden disabled>next photos</button>
         <p id="photos-loading"></p>
-        <div id = "inat-photos"></div>
+        <div id = "inat-photos" hidden></div>
 
-        <div id = "wikidata">
+        <div id = "wikidata" hidden>
             <p id = "wikidata-id"></p>
             <p id = "commons-url"></p>
+            <div id = "commons-photos"></div>
             <p id = "wikipedia-url"></p>
         </div>
 
