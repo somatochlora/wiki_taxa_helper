@@ -118,8 +118,12 @@ class CommonsPhoto extends Photo {
         super("https://commons.wikimedia.org/w/thumb.php?f=" + commonsPage + "&w=75");
         //("https://commons.wikimedia.org/wiki/File:" + commonsPage)
         this.commonsPage = commonsPage;
+        this.id = commonsPage; //user for "inaturalistObjects" class;
         this.buttonValue = commonsPage;
+        this.dataRetrieved = false;
     }
+
+
 
     isPhoto() {
         let filetype = this.commonsPage.slice(this.commonsPage.lastIndexOf(".")).toLowerCase();
@@ -132,6 +136,21 @@ class CommonsPhoto extends Photo {
                 return true;
         }
         return false;
+    }
+
+    async getInfo() {
+        if (this.dataRetrieved) {
+            return this.dataResult;
+        }
+        let data = await getJSON("https://en.wikipedia.org/w/api.php?action=query&titles=File:" + this.commonsPage + "&format=json&origin=*&prop=imageinfo&iiprop=timestamp|user|userid|url|size|mediatype|comment|commonmetadata")
+        let result = {};
+        console.log(data);
+        // todo need to use api to get info from the photo page, not just that attached to the file
+        result.url = "https://commons.wikimedia.org/w/thumb.php?f=" + this.commonsPage + "&w=500"
+        result.linkUrl = data.query.pages[-1].imageinfo[0].descriptionurl;
+        result.uploader = data.query.pages[-1].imageinfo[0].user;
+        this.dataResult = result;
+        return result;
     }
 }
 
@@ -255,6 +274,7 @@ class PhotoiNatTaxon extends iNatTaxon {
         this.curMaxId = -1;
         this.photosLoaded = false;
         
+        this.commonsPhotos = new iNaturalistObjects;
     }
 
     // loads all the observations and photos from a single api call
@@ -304,7 +324,8 @@ class PhotoiNatTaxon extends iNatTaxon {
 
     // will return the wikidata id for the taxon if available
     async loadWikidata () {
-        if ("wikidataID" in this) {
+        if (this.wikidataLoaded) {
+            console.log("already loaded wikidata")
             return;
         }
         let results = await wikidataQuery(this.id);
@@ -345,7 +366,7 @@ class PhotoiNatTaxon extends iNatTaxon {
             }
             
         }
-        
+        this.wikidataLoaded = true;
         
     }
     
@@ -510,6 +531,7 @@ async function displayChild() {
                 for (let photo of curChild.commonsPhotoData.query.categorymembers) {
                     let curPhoto = new CommonsPhoto(photo.title);
                     if (curPhoto.isPhoto()) {
+                        curChild.commonsPhotos.add(curPhoto);
                         document.querySelector("#commons-photos").appendChild(curPhoto.returnDiv());
                     }
                 }
@@ -647,6 +669,7 @@ parentInput.addEventListener('input', () => {
     inputWaitTimer = setTimeout(dropDownAutoComplete, AUTOCOMPLETEWAIT);
 });
 
+// activates when one of the autocomplete results is selected
 document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
     if (event.target.nodeName != 'BUTTON') return;
 
@@ -672,10 +695,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
     nextChildButton.hidden = false;
     prevChildButton.hidden = false;    
     nextPhotosButton.hidden = false;
-    prevPhotosButton.hidden = false; 
-    
-    
-    
+    prevPhotosButton.hidden = false;  
 });
 
 nextChildButton.addEventListener('click', async function() {
@@ -746,6 +766,44 @@ document.querySelector('#inat-photos').addEventListener('click', function(event)
     let link = document.createElement("a");
     link.innerHTML = "iNaturalist Observation Link";
     link.href = "https://www.inaturalist.org/observations/" + curObs.id;
+    link.target = "_blank";
+
+    for (let i = 0; i < paras.length; i++) {
+        let para = document.createElement("p");
+        para.innerHTML = paras[i];
+        document.querySelector('#photo-modal-text').appendChild(para);
+    }
+    document.querySelector('#photo-modal-text').appendChild(link);
+
+    photoModal.style.display = "block";
+});
+
+document.querySelector('#commons-photos').addEventListener('click', async function(event) {
+    let curPhotoName;
+    if (event.target.nodeName == 'BUTTON') {
+        curPhotoName = event.target.value;
+    } else if (event.target.nodeName == 'IMG') {
+        curPhotoName = event.target.parentNode.value;
+    } else {
+        return;
+    }
+    let curTaxon = leaves.getByIndex(curLeafNum);
+    let curPhoto = curTaxon.commonsPhotos[curPhotoName];
+    let data = await curPhoto.getInfo();
+
+    let imgHtml = document.createElement("img");
+    imgHtml.src = data.url;
+
+    document.querySelector('#photo-modal-photo').innerHTML = "";
+    document.querySelector('#photo-modal-photo').appendChild(imgHtml);
+
+    document.querySelector('#photo-modal-text').innerHTML = "";
+    let paras = [];
+    paras.push(curPhoto.commonsPage);
+    paras.push("Uploaded by: " + data.uploader);
+    let link = document.createElement("a");
+    link.innerHTML = "Commons Link";
+    link.href = data.linkUrl;
     link.target = "_blank";
 
     for (let i = 0; i < paras.length; i++) {
