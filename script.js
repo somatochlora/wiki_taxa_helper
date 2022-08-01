@@ -35,13 +35,31 @@ class iNaturalistObjects {
     }
 }
 
-// Each photo returned from iNaturalist is an instance of this class
 class Photo {
+    constructor(url) {
+        this.url = url;
+        this.borderColour = "gray";
+    }
+
+    returnDiv() {
+        let image = document.createElement('img');
+        image.src = this.url;
+        image.style = "border:4px solid " + this.borderColour + "; border-radius:15px;";
+        let button = document.createElement('button');
+        button.style = "margin:4px; padding:4px;";
+        button.value = this.buttonValue;
+        button.appendChild(image); 
+        return button;
+    }
+}
+
+// Each photo returned from iNaturalist is an instance of this class
+class iNatPhoto extends Photo {
     constructor(observationData, photoNum, observationRef) {
+        super(observationData.photos[photoNum].url);
         // unique iNat photo ID
         this.id = observationData.photos[photoNum].id;
         this.license = observationData.photos[photoNum].license_code;
-        this.url = observationData.photos[photoNum].url;
 
         // string for the person who uploaded the photo
         this.attribution = observationData.photos[photoNum].attribution;
@@ -55,6 +73,20 @@ class Photo {
         this.qualityGrade = observationData.quality_grade;
 
         this.observationRef = observationRef;
+
+        switch (this.qualityGrade) {
+            case "research": 
+                this.borderColour = "green";
+                break;
+            case "needs_id":
+                this.borderColour = "yellow";
+                break;
+            case "casual":
+                this.borderColour = "red";
+                break;
+        }
+
+        this.buttonValue = this.id;
     }
 
     // does photo have a commons-compatible license?
@@ -72,40 +104,22 @@ class Photo {
         return this.observationRef.taxonName;
     }
 
-    // returns a formatted html element for the photo
-    returnDiv() {
-        let image = document.createElement('img');
-        image.src = this.url;
-        let borderColour;
-        switch (this.qualityGrade) {
-            case "research": 
-                borderColour = "green";
-                break;
-            case "needs_id":
-                borderColour = "yellow";
-                break;
-            case "casual":
-                borderColour = "red";
-                break;
-        }
-        image.style = "border:4px solid " + borderColour + "; border-radius:15px;";
-
-        let button = document.createElement('button');
-        //link.target = "_blank";
-        //link.href = "https://www.inaturalist.org/observations/" + this.observationId;     
-        button.style = "margin:4px; padding:4px;";
-        button.value = this.id;
-
-        button.appendChild(image);       
-
-        return button;
-    }
-
     getSizeUrl(size) {
         //size can be square, small, medium, large, original
         return this.url.replace("square", size);
     }
 
+}
+
+class CommonsPhoto extends Photo {
+    constructor (commonsPage) {
+        commonsPage = commonsPage.replaceAll(" ", "_");
+        commonsPage = commonsPage.replace("File:" , "");
+        super("https://commons.wikimedia.org/w/thumb.php?f=" + commonsPage + "&w=75");
+        //("https://commons.wikimedia.org/wiki/File:" + commonsPage)
+        this.commonsPage = commonsPage;
+        this.buttonValue = commonsPage;
+    }
 }
 
 class GenericTaxon {
@@ -249,7 +263,7 @@ class PhotoiNatTaxon extends iNatTaxon {
             newObs.geoprivacy = observation.geoprivacy;
             if (newObs.geoprivacy = null) newObs.geoprivacy = "open";  // if an iNat observation geoprivacy has never been changed, it will show up as "null"          
             for (let i = 0; i < observation.photos.length; i++) {
-                let curPhoto = new Photo(observation, i, newObs);
+                let curPhoto = new iNatPhoto(observation, i, newObs);
                 if (curPhoto.isLicensed()) this.photos[curPhoto.id] = curPhoto; // it is possible for only some of the photos in an observation to be freely licensed
                 this.photoIds.push(curPhoto.id);
             }
@@ -301,19 +315,25 @@ class PhotoiNatTaxon extends iNatTaxon {
                 this.commonsURL = false;
             } else {
                 this.commonsURL = commonsResults.results.bindings[0].article.value;
+                if ( this.commonsURL.indexOf("Category") == -1) {
+                    this.commonsURL = this.commonsURL.replace("wiki/", "wiki/Category:");
+                }
+                this.commonsPage = this.commonsURL.replace("https://commons.wikimedia.org/wiki/", "");
+                this.commonsPhotoData = await getJSON("https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&format=json&origin=*&cmtype=file&cmtitle=" + this.commonsPage);
+                console.log(this.commonsPhotoData);
             }
-            if (this.commonsURL.indexOf("Category") == -1) {
-                this.commonsURL = this.commonsURL.replace("wiki/", "wiki/Category:");
-            }
-            this.commonsPage = this.commonsURL.replace("https://commons.wikimedia.org/wiki/", "");
+            
 
             if (wikiResults.results.bindings.length === 0) {
                 this.wikiURL = false;
             } else {
                 this.wikiURL = wikiResults.results.bindings[0].article.value;
+                this.wikiPage = this.wikiURL.replace("https://en.wikipedia.org/wiki/", "");
             }
-            this.wikiPage = this.wikiURL.replace("https://en.wikipedia.org/wiki/", "");
-        }   
+            
+        }
+        
+        
     }
     
     // load the first set of photos
@@ -469,6 +489,14 @@ async function displayChild() {
             link.innerHTML = curChild.commonsPage;
             document.querySelector("#commons-url").innerHTML = "Commons page: ";
             document.querySelector("#commons-url").appendChild(link);
+            if (curChild.commonsPhotoData?.query?.categorymembers.length > 0) {
+                for (let photo of curChild.commonsPhotoData.query.categorymembers) {
+                    let curPhoto = new CommonsPhoto(photo.title);
+                    document.querySelector("#commons-url").appendChild(curPhoto.returnDiv());
+                }
+            }
+            
+
         }
         if (!curChild.wikiURL) {
             document.querySelector("#wikipedia-url").innerHTML = "no English Wikipedia page found";
@@ -481,6 +509,8 @@ async function displayChild() {
             document.querySelector("#wikipedia-url").appendChild(link);
         }
     }
+
+
 
 }
 
