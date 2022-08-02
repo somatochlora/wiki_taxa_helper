@@ -63,6 +63,13 @@ ul {
     padding: 10px;
 }
 
+#commons-photos {
+    display:flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+}
+
 .modal {
     display: none;
     position: fixed;

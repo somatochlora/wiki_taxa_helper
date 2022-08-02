@@ -123,8 +123,6 @@ class CommonsPhoto extends Photo {
         this.dataRetrieved = false;
     }
 
-
-
     isPhoto() {
         let filetype = this.commonsPage.slice(this.commonsPage.lastIndexOf(".")).toLowerCase();
         console.log(filetype);
