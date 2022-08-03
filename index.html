@@ -6,36 +6,52 @@
         <link rel = "stylesheet" href = "styles.css">
     </head>
     <body>
-        <label for = "iNatTaxonID">What taxon do you want to look up?</label>
-        <input type = "text" placeholder = "taxon name" id = "iNatTaxonID">
-        <select name = "rank" id = "rank" hidden></select>
-        <p id="autocomplete-loading"></p>
-        <div id = "autocomplete-results" hidden></div>
-        <p></p>
-        <button type = "button" id = "prev-child" hidden disabled>previous taxon</button>
-        <button type = "button" id = "next-child" hidden disabled>next taxon</button>
-        <p></p>
-        <button type = "button" id = "prev-photos" hidden disabled>previous photos</button>
-        <button type = "button" id = "next-photos" hidden disabled>next photos</button>
-        <p id="photos-loading"></p>
-        <div id = "inat-photos" hidden></div>
+        <section id = taxon-choice>
+            <div id = parent-selector>
+                <label for = "iNatTaxonID">What taxon do you want to look up?</label>
+                <input type = "text" placeholder = "taxon name" id = "iNatTaxonID">
+            </div>
+            <div id = leaf-rank-selector>
+                <select name = "leaf-rank-dropdown" id = "leaf-rank-dropdown" hidden></select>
+            </div>      
+            <div id = "autocomplete-results">
+                <p id="autocomplete-loading" hidden>loading...</p>
+                <div id = "autocomplete-results-list" hidden></div>
+            </div>
+        </section>
+        <section id = leaf-navigation>
+            <div id = leaf-nav-buttons class = bidir-buttons-container>
+                <button type = "button" id = "prev-child" class = "bidir-button" hidden disabled>previous taxon</button>
+                <button type = "button" id = "next-child" class = "bidir-button" hidden disabled>next taxon</button>
+            </div>
+        </section>
+        <section id = inat-results>
+            <p id="photos-loading"></p>
+            <div id = inat-photos-text></div>
+            <div id = leaf-nav-buttons class = bidir-buttons-container>
+                <button type = "button" id = "prev-photos" class = "bidir-button" hidden disabled>previous photos</button>
+                <button type = "button" id = "next-photos" class = "bidir-button" hidden disabled>next photos</button>
+            </div>
+            <div id = "inat-photos-container" class = "thumbnails-container" hidden></div>
+        </section>
+        <section id = wiki-results>
+            <div id = "wikidata" hidden>
+                <p id = "wikidata-id"></p>
+                <p id = "commons-url"></p>
+                <div id = "commons-photos" class = "thumbnails-container"></div>
+                <p id = "wikipedia-url"></p>
+            </div>
+        </section>
 
-        <div id = "wikidata" hidden>
-            <p id = "wikidata-id"></p>
-            <p id = "commons-url"></p>
-            <div id = "commons-photos"></div>
-            <p id = "wikipedia-url"></p>
-        </div>
-
-        <div id="photo-modal" class="modal">
+        <section id = "photo-modal" class = "modal">
             <div class="modal-frame">
-              <span id="close-photo-modal" class="close">&times;</span>
-              <div id="photo-modal-photo"></div>
-              <div id="photo-modal-text"></div>
-              <button id="photo-modal-upload" disabled>Upload to Commons</button>
-            </div>          
-          </div>
-
+                <span id="close-photo-modal" class="close">&times;</span>
+                <div id="photo-modal-photo"></div>
+                <div id="photo-modal-text"></div>
+                <button id="photo-modal-upload" disabled>Upload to Commons</button>
+            </div>
+        </section>    
+        
         <script src = "script.js"></script>
 
     </body>

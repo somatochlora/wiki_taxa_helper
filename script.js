@@ -10,6 +10,80 @@ async function getJSON(url) {
     return data; // returns a promise, which resolves to this data value
 }
 
+class ThumbnailsSection {
+    constructor(containerDiv) {
+        this.containerDiv = containerDiv;
+
+        this.loadingDiv = document.createElement("div");
+        this.loadingDiv.innerHTML = "loading...";
+        this.loadingDiv.hidden = true;
+        this.containerDiv.appendChild(this.loadingDiv);
+
+        this.upperTextDiv = document.createElement("div");
+        this.containerDiv.appendChild(this.upperTextDiv);
+
+        this.pageButtonsDiv = document.createElement("div");
+        this.containerDiv.appendChild(this.pageButtonsDiv);
+
+        this.prevButton = document.createElement("button");
+        this.prevButton.innerText = "previous photos";
+        this.prevButton.disabled = true;
+        this.prevButton.addEventListener("click", this.prevPage);
+
+        this.nextButton = document.createElement("button");
+        this.nextButton.innerText = "next photos";
+        this.nextButton.disabled = true;
+        this.nextButton.addEventListener("click", this.nextPage);
+        
+        this.pageButtonsDiv.appendChild(this.prevButton);
+        this.pageButtonsDiv.appendChild(this.nextButton);
+
+        this.thumbnailsContainer = document.createElement("div");
+        this.containerDiv.appendChild(this.thumbnailsContainer);
+
+        this.pages = []
+        this.curPage = -1;
+    }
+
+    updateUpperText (text) {
+        this.upperTextDiv.innerHTML = "";
+        this.upperTextDiv.innerHTML = text;
+    }
+
+    startLoading () {
+        this.loadingDiv.hidden = false;
+    }
+
+    endLoading () {
+        this.loadingDiv.hidden = true;
+    }
+
+    addPage (innerHTML) {
+        this.pages.push(innerHTML);
+        if (this.curPage === this.pages.length - 2) this.nextButton.disabled = false;
+    }
+
+    nextPage () {
+        this.curPage++;
+        this.thumbnailsContainer.innerHtml = this.pages[this.curPage];
+        if (this.curPage < this.pages.length - 1) {
+            this.nextButton.disabled = false;
+        } else {
+            this.nextButton.disabled = true
+        }
+    }
+
+    prevPage () {
+        this.curPage--;
+        this.thumbnailsContainer.innerHtml = this.pages[this.curPage];
+        if (this.curPage === 0) {
+            this.nextButton.disabled = true;
+        } else {
+            this.nextButton.disabled = false;
+        }
+    }
+}
+
 class iNaturalistObjects {
     constructor() {
         this.length = 0;
@@ -468,8 +542,9 @@ async function displayChild() {
 
     para.innerHTML = curChild.formattedName() + ": " + curChild.observationCount + " observations with licensed photos";
 
+    document.querySelector("#inat-photos-text").innerHTML = "";
     iNatPhotosDiv.innerHTML = "";
-    iNatPhotosDiv.appendChild(para);
+    document.querySelector("#inat-photos-text").appendChild(para);
     iNatPhotosDiv.appendChild(curChild.makePhotos());
 
     // enables/disables the buttons for navigating between children as necessarry 
@@ -505,7 +580,7 @@ async function displayChild() {
         prevPhotosButton.disabled = false;
     }
     document.querySelector("#photos-loading").innerHTML = "";
-    document.querySelector("#inat-photos").hidden = false;
+    document.querySelector("#inat-photos-container").hidden = false;
 
     document.querySelector("#commons-photos").innerHTML = "";
     await wikidataLoaded;
@@ -580,7 +655,7 @@ async function iNatAutoCompleteMake() {
 
 function dropDownAutoComplete() {
     iNatAutoCompleteMake();
-    document.querySelector('#autocomplete-loading').innerHTML = "";
+    document.querySelector('#autocomplete-loading').hidden = true;
 }
 
 async function wikidataQuery (taxon, url = false) {
@@ -601,8 +676,8 @@ async function wikidataQuery (taxon, url = false) {
 }
 
 function hideAllSections () {
-    document.querySelector("#autocomplete-results").hidden = true;
-    document.querySelector("#inat-photos").hidden = true;
+    document.querySelector("#autocomplete-results-list").hidden = true;
+    document.querySelector("#inat-photos-container").hidden = true;
     document.querySelector("#wikidata").hidden = true;
 }
 
@@ -637,24 +712,24 @@ let inputWaitTimer;
 
 // Quick references for various html elements
 const parentInput = document.querySelector("#iNatTaxonID");
-const iNatPhotosDiv = document.querySelector('#inat-photos');
+const iNatPhotosDiv = document.querySelector('#inat-photos-container');
 const prevChildButton = document.querySelector('#prev-child');
 const nextChildButton = document.querySelector('#next-child');
 const prevPhotosButton = document.querySelector('#prev-photos');
 const nextPhotosButton = document.querySelector('#next-photos');
-const autocompleteResultsDiv = document.querySelector('#autocomplete-results');
+const autocompleteResultsDiv = document.querySelector('#autocomplete-results-list');
 const photoModal = document.querySelector("#photo-modal");
 
 let targetRank = TAXONOMYSTRUCTURE.indexOf("species");
 
-let rankDropDown = document.querySelector("#rank");
-    for (let rank of TAXONOMYSTRUCTURE) {
-        let item = document.createElement("option");
-        item.value = rank;
-        item.innerHTML = rank;
-        if (rank == "species") item.selected = true;
-        rankDropDown.appendChild(item)
-    }
+let rankDropDown = document.querySelector("#leaf-rank-dropdown");
+for (let rank of TAXONOMYSTRUCTURE) {
+    let item = document.createElement("option");
+    item.value = rank;
+    item.innerHTML = rank;
+    if (rank == "species") item.selected = true;
+    rankDropDown.appendChild(item)
+}
 rankDropDown.hidden = false;
 
 rankDropDown.addEventListener('change', () => {
@@ -662,13 +737,13 @@ rankDropDown.addEventListener('change', () => {
 });
 
 parentInput.addEventListener('input', () => {
-    document.querySelector('#autocomplete-loading').innerHTML = "loading...";
+    document.querySelector('#autocomplete-loading').hidden = true;
     clearTimeout(inputWaitTimer)
     inputWaitTimer = setTimeout(dropDownAutoComplete, AUTOCOMPLETEWAIT);
 });
 
 // activates when one of the autocomplete results is selected
-document.querySelector('#autocomplete-results').addEventListener('click', async function(event) {
+document.querySelector('#autocomplete-results-list').addEventListener('click', async function(event) {
     if (event.target.nodeName != 'BUTTON') return;
 
     nextChildButton.disabled = true;
@@ -678,7 +753,7 @@ document.querySelector('#autocomplete-results').addEventListener('click', async 
 
     document.querySelector('#photos-loading').innerHTML = "loading...";
     leaves.empty();
-    document.querySelector('#autocomplete-results').innerHTML = "";
+    document.querySelector('#autocomplete-results-list').innerHTML = "";
 
     let taxonID = event.target.value;
     let data = await getJSON("https://api.inaturalist.org/v1/taxa/" + taxonID);
@@ -736,7 +811,7 @@ prevPhotosButton.addEventListener('click', async function() {
     iNatPhotosDiv.appendChild(leaves.getByIndex(curLeafNum).prevPhotos());
 });
 
-document.querySelector('#inat-photos').addEventListener('click', function(event) {
+document.querySelector('#inat-photos-container').addEventListener('click', function(event) {
     let curImgId;
     if (event.target.nodeName == 'BUTTON') {
         curImgId = event.target.value;
