@@ -11,35 +11,40 @@ async function getJSON(url) {
 }
 
 class ThumbnailsSection {
-    constructor(containerDiv) {
-        this.containerDiv = containerDiv;
+    constructor(preLoadFunc = () => {}) {
+        this.parentDiv = document.createElement("div")
 
         this.loadingDiv = document.createElement("div");
         this.loadingDiv.innerHTML = "loading...";
         this.loadingDiv.hidden = true;
-        this.containerDiv.appendChild(this.loadingDiv);
+        this.parentDiv.appendChild(this.loadingDiv);
 
         this.upperTextDiv = document.createElement("div");
-        this.containerDiv.appendChild(this.upperTextDiv);
+        this.parentDiv.appendChild(this.upperTextDiv);
 
         this.pageButtonsDiv = document.createElement("div");
-        this.containerDiv.appendChild(this.pageButtonsDiv);
+        this.parentDiv.appendChild(this.pageButtonsDiv);
 
         this.prevButton = document.createElement("button");
         this.prevButton.innerText = "previous photos";
         this.prevButton.disabled = true;
-        this.prevButton.addEventListener("click", this.prevPage);
+        this.prevButton.addEventListener("click", this.prevPage.bind(this));
 
         this.nextButton = document.createElement("button");
         this.nextButton.innerText = "next photos";
         this.nextButton.disabled = true;
-        this.nextButton.addEventListener("click", this.nextPage);
+        this.nextButton.addEventListener("click", async () => {
+            preLoadFunc(); 
+            //preload function should call addPage() on this instance when finished if applicable
+            this.nextPage();
+        });
         
         this.pageButtonsDiv.appendChild(this.prevButton);
         this.pageButtonsDiv.appendChild(this.nextButton);
 
         this.thumbnailsContainer = document.createElement("div");
-        this.containerDiv.appendChild(this.thumbnailsContainer);
+        this.thumbnailsContainer.id = "inat-photos-container";
+        this.parentDiv.appendChild(this.thumbnailsContainer);
 
         this.pages = []
         this.curPage = -1;
@@ -60,27 +65,34 @@ class ThumbnailsSection {
 
     addPage (innerHTML) {
         this.pages.push(innerHTML);
-        if (this.curPage === this.pages.length - 2) this.nextButton.disabled = false;
+        if (this.curPage != -1) {
+            this.nextButton.disabled = false;
+        } else {
+            this.curPage = 0;
+            this.thumbnailsContainer.innerHTML = this.pages[0];
+        }        
     }
 
-    nextPage () {
+    nextPage () {        
         this.curPage++;
-        this.thumbnailsContainer.innerHtml = this.pages[this.curPage];
+        this.thumbnailsContainer.innerHTML = this.pages[this.curPage];
         if (this.curPage < this.pages.length - 1) {
             this.nextButton.disabled = false;
         } else {
             this.nextButton.disabled = true
         }
+        this.prevButton.disabled = false;
     }
 
     prevPage () {
         this.curPage--;
-        this.thumbnailsContainer.innerHtml = this.pages[this.curPage];
+        this.thumbnailsContainer.innerHTML = this.pages[this.curPage];
         if (this.curPage === 0) {
-            this.nextButton.disabled = true;
+            this.prevButton.disabled = true;
         } else {
-            this.nextButton.disabled = false;
+            this.prevButton.disabled = false;
         }
+        this.nextButton.disabled = false;
     }
 }
 
@@ -199,7 +211,6 @@ class CommonsPhoto extends Photo {
 
     isPhoto() {
         let filetype = this.commonsPage.slice(this.commonsPage.lastIndexOf(".")).toLowerCase();
-        console.log(filetype);
         switch (filetype) {
             case ".jpg":
             case ".jpeg":
@@ -216,7 +227,6 @@ class CommonsPhoto extends Photo {
         }
         let data = await getJSON("https://en.wikipedia.org/w/api.php?action=query&titles=File:" + this.commonsPage + "&format=json&origin=*&prop=imageinfo&iiprop=timestamp|user|userid|url|size|mediatype|comment|commonmetadata")
         let result = {};
-        console.log(data);
         // todo need to use api to get info from the photo page, not just that attached to the file
         result.url = "https://commons.wikimedia.org/w/thumb.php?f=" + this.commonsPage + "&w=500"
         result.linkUrl = data.query.pages[-1].imageinfo[0].descriptionurl;
@@ -279,16 +289,13 @@ class ParentiNatTaxon extends iNatTaxon {
         let taxonData = this.traversalPointer.taxonData;
 
         for (let i = 0; i < MAXNUMBEROFSEARCHSTEPS; i++) {
-            console.log(this.traversalPointer.formattedName());
             
             // case found a leaf
             if (this.traversalPointer.numericRank >= lowRank) {
                               
                 if (nextFound) {
-                    console.log("found next leaf");
                     return result;
-                } else {
-                    console.log("found this leaf");       
+                } else {       
                     result = new PhotoiNatTaxon(this.traversalPointer, true);
                     nextFound = true;  
                     if (this.traversalPointer == this) {
@@ -298,14 +305,11 @@ class ParentiNatTaxon extends iNatTaxon {
                     }                               
                 }
             } else if (this.traversalPointer.childrenData.length > 0) { //case we need to move down a level
-                console.log("moving down a level");
                 taxonData = await getJSON("https://api.inaturalist.org/v1/taxa/" + this.traversalPointer.childrenData[0].id);
                 let newChild = new ParentiNatTaxon (taxonData.results[0], this.traversalPointer);        
                 this.traversalPointer.childrenData.shift();
                 this.traversalPointer = newChild;
-            } else { //case we need to move up a level
-                console.log("moving up a level");
-                
+            } else { //case we need to move up a level                
                 if (this.traversalPointer == this && this.childrenData.length == 0) {
                     this.treeLoaded = true;
                     return result;
@@ -317,10 +321,8 @@ class ParentiNatTaxon extends iNatTaxon {
         // no leaves found after a limited number of searches
         this.treeLoaded = true;
         if (result === 0) {
-            console.log("no leaves found");
             return -1;
         }
-        console.log("last leaf found");
         return result;
 
     }
@@ -347,6 +349,9 @@ class PhotoiNatTaxon extends iNatTaxon {
         this.photosLoaded = false;
         
         this.commonsPhotos = new iNaturalistObjects;
+
+        this.iNatDisplayHelper = new ThumbnailsSection(this.preloadPhotos.bind(this));
+
     }
 
     // loads all the observations and photos from a single api call
@@ -426,7 +431,6 @@ class PhotoiNatTaxon extends iNatTaxon {
                 }
                 this.commonsPage = this.commonsURL.replace("https://commons.wikimedia.org/wiki/", "");
                 this.commonsPhotoData = await getJSON("https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&format=json&origin=*&cmtype=file&cmtitle=" + this.commonsPage);
-                console.log(this.commonsPhotoData);
             }
             
 
@@ -448,47 +452,48 @@ class PhotoiNatTaxon extends iNatTaxon {
         if (this.observationCount == this.observations.length) {
             this.photosLoaded = true;
         }
+        this.iNatDisplayHelper.updateUpperText(this.formattedName() + ": " + this.observationCount + " observations with licensed photos");
+        this.iNatDisplayHelper.addPage(this.makePhotos());
     }
 
     // used for loading the next set of photos TODO can probably be combined with the above
     async preloadPhotos () {
         if (this.photosLoaded) {
+            console.log("all photos already loaded");
             return;
-        }
+        }        
         if (this.photoIds.length - this.photoPos < PHOTODISPLAYNUM * 2) {
+            console.log("photos fetches");
             this.addObservations(await this.getLicensedPhotos());
         }
         if (this.observationCount == this.observations.length) {
+            console.log("all photos now loaded");
             this.photosLoaded = true;
         }
+        this.iNatDisplayHelper.addPage(this.makePhotos());
     }
 
     // create an html element containing the current set of photos
     makePhotos () {
         let photosHTML = ""
+        console.log("photo pos: " + this.photoPos);
         for (let i = this.photoPos; i < this.photoPos + PHOTODISPLAYNUM; i++) {
             if (i == this.photoIds.length) break;
             photosHTML += this.photos[this.photoIds[i]].returnDiv().outerHTML + "\n";
         }
+        this.photoPos += PHOTODISPLAYNUM;
         return photosHTML;
     }
 
     // go to the next page of photos
     nextPhotos () {
-        nextPhotosButton.disabled = true;
-        this.photoPos += PHOTODISPLAYNUM;
-        prevPhotosButton.disabled = false;      
+        this.photoPos += PHOTODISPLAYNUM;     
         return this.makePhotos();
     }
 
     // go to the previous page of photos
     prevPhotos () {
-        prevPhotosButton.disabled = true;
         this.photoPos -= PHOTODISPLAYNUM;
-        nextPhotosButton.disabled = false;
-        if (this.photoPos > 0) {
-            prevPhotosButton.disabled = false;
-        }
         return this.makePhotos();
     }
 
@@ -499,6 +504,13 @@ class PhotoiNatTaxon extends iNatTaxon {
         }
         return false;
     }
+
+    display() {
+        document.querySelector("#inat-results").innerHTML = "";
+        document.querySelector("#inat-results").appendChild(this.iNatDisplayHelper.parentDiv);
+
+        /* WIKIDATA/COMMONS content */
+    }
 }
 
 // preloads the next child taxa before it needs to be displayed
@@ -507,17 +519,14 @@ async function loadNextChild(override = false) {
 
     //checks that we are not already on the last child
     if ((curLeafNum < leaves.length - 1 && !override) || (parentTaxon.treeLoaded)) {
-        console.log("next child not being loaded");
         return false;
     }
-
-    console.log("next child being loaded");
-    console.log(parentTaxon.formattedName());
     let tmp = await parentTaxon.nextLeaf2(targetRank);
 
     if(tmp !== -1) {
         leaves.add(tmp);
         await tmp.loadPhotos();
+        tmp.preloadPhotos();
         return true;
     }
     return false;
@@ -527,24 +536,15 @@ async function loadNextChild(override = false) {
 // displays the current child taxon and preloads the next
 async function displayChild() {
     
-    hideAllSections();
+    //hideAllSections();
     // starts preloading the next child
     nextChildPromise = loadNextChild();
 
-
-    console.log(curLeafNum);
     let curChild = leaves.getByIndex(curLeafNum);
 
     let wikidataLoaded = curChild.loadWikidata();
 
-    let para = document.createElement('p');
-
-    para.innerHTML = curChild.formattedName() + ": " + curChild.observationCount + " observations with licensed photos";
-
-    document.querySelector("#inat-photos-text").innerHTML = "";
-    iNatPhotosDiv.innerHTML = "";
-    document.querySelector("#inat-photos-text").appendChild(para);
-    iNatPhotosDiv.innerHTML = curChild.makePhotos();
+    curChild.display()
 
     // enables/disables the buttons for navigating between children as necessarry 
     
@@ -566,6 +566,7 @@ async function displayChild() {
         prevChildButton.innerHTML = "<--  " + leaves.getByIndex(curLeafNum - 1).formattedName();
     }
 
+    /*
     // enables/disables the buttons for navigating between photos as necessarry 
     if (!curChild.onLastPage()) {
         nextPhotosButton.disabled = false;
@@ -580,6 +581,8 @@ async function displayChild() {
     }
     document.querySelector("#photos-loading").innerHTML = "";
     document.querySelector("#inat-photos-container").hidden = false;
+    */
+
 
     document.querySelector("#commons-photos").innerHTML = "";
     await wikidataLoaded;
@@ -674,12 +677,13 @@ async function wikidataQuery (taxon, url = false) {
     return data;
 }
 
+/*
 function hideAllSections () {
     document.querySelector("#autocomplete-results-list").hidden = true;
     document.querySelector("#inat-photos-container").hidden = true;
     document.querySelector("#wikidata").hidden = true;
 }
-
+*/
 
 // Number of photos to display at a time
 // This will also be the number of observations retrieved at one time
@@ -747,10 +751,7 @@ document.querySelector('#autocomplete-results-list').addEventListener('click', a
 
     nextChildButton.disabled = true;
     prevChildButton.disabled = true;    
-    nextPhotosButton.disabled = true;
-    prevPhotosButton.disabled = true;
 
-    document.querySelector('#photos-loading').innerHTML = "loading...";
     leaves.empty();
     document.querySelector('#autocomplete-results-list').innerHTML = "";
 
@@ -765,15 +766,13 @@ document.querySelector('#autocomplete-results-list').addEventListener('click', a
     curLeafNum = 0;
     await displayChild()
     nextChildButton.hidden = false;
-    prevChildButton.hidden = false;    
-    nextPhotosButton.hidden = false;
-    prevPhotosButton.hidden = false;  
+    prevChildButton.hidden = false;      
 });
 
 nextChildButton.addEventListener('click', async function() {
     nextChildButton.disabled = true;
-    nextPhotosButton.disabled = true;
-    prevPhotosButton.disabled = true;
+    //nextPhotosButton.disabled = true;
+    //prevPhotosButton.disabled = true;
     await nextChildPromise;
     curLeafNum += 1;
     
@@ -786,8 +785,8 @@ nextChildButton.addEventListener('click', async function() {
 
 prevChildButton.addEventListener('click', function() {
     prevChildButton.disabled = true;
-    nextPhotosButton.disabled = true;
-    prevPhotosButton.disabled = true;
+    //nextPhotosButton.disabled = true;
+    //prevPhotosButton.disabled = true;
     curLeafNum -= 1;
     displayChild()
     .catch(error => {
@@ -795,6 +794,7 @@ prevChildButton.addEventListener('click', function() {
     });
 });
 
+/*
 nextPhotosButton.addEventListener('click', async function() {
 
     iNatPhotosDiv.innerHTML = "";
@@ -809,7 +809,9 @@ prevPhotosButton.addEventListener('click', async function() {
     iNatPhotosDiv.innerHTML = "";
     iNatPhotosDiv.innerHTML = leaves.getByIndex(curLeafNum).prevPhotos();
 });
+*/
 
+/*
 document.querySelector('#inat-photos-container').addEventListener('click', function(event) {
     let curImgId;
     if (event.target.nodeName == 'BUTTON') {
@@ -849,6 +851,7 @@ document.querySelector('#inat-photos-container').addEventListener('click', funct
 
     photoModal.style.display = "block";
 });
+*/
 
 document.querySelector('#commons-photos').addEventListener('click', async function(event) {
     let curPhotoName;
