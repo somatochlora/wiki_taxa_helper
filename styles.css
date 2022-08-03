@@ -5,6 +5,9 @@ body {
     font-family: sans-serif;
     font-size: 18px;
     margin: 0;
+    display:flex;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 section {
@@ -68,15 +71,34 @@ ul {
     list-style-type: none;
 }
 
-
-
-
-
 .thumbnails-container {
     display:flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    background-color: #373737;
+    border-radius:15px;
+    margin: 5px;
+    padding: 3px;
+    display: inline-block;
+}
+
+.nav-buttons-div {
+    display:flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    background-color: #373737;
+    border-radius:15px;
+    margin: 5px;
+    padding: 3px;
+    display: inline-block;
+}
+
+.nav-button {
+    margin: 3px;
+    padding: 6px;
+    border: 2px solid #888;
 }
 
 .modal {

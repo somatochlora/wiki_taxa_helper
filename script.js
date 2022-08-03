@@ -23,15 +23,18 @@ class ThumbnailsSection {
         this.parentDiv.appendChild(this.upperTextDiv);
 
         this.pageButtonsDiv = document.createElement("div");
+        this.pageButtonsDiv.setAttribute("class", "nav-buttons-div");
         this.parentDiv.appendChild(this.pageButtonsDiv);
 
         this.prevButton = document.createElement("button");
         this.prevButton.innerText = "previous photos";
+        this.prevButton.setAttribute("class", "nav-button");
         this.prevButton.disabled = true;
         this.prevButton.addEventListener("click", this.prevPage.bind(this));
 
         this.nextButton = document.createElement("button");
         this.nextButton.innerText = "next photos";
+        this.nextButton.setAttribute("class", "nav-button");
         this.nextButton.disabled = true;
         this.nextButton.addEventListener("click", async () => {
             preLoadFunc(); 
@@ -44,6 +47,7 @@ class ThumbnailsSection {
 
         this.thumbnailsContainer = document.createElement("div");
         this.thumbnailsContainer.id = "inat-photos-container";
+        this.thumbnailsContainer.setAttribute("class", "thumbnails-container");
         this.parentDiv.appendChild(this.thumbnailsContainer);
 
         this.pages = []
