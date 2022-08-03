@@ -465,13 +465,12 @@ class PhotoiNatTaxon extends iNatTaxon {
 
     // create an html element containing the current set of photos
     makePhotos () {
-        let photosDiv = document.createElement('div');
+        let photosHTML = ""
         for (let i = this.photoPos; i < this.photoPos + PHOTODISPLAYNUM; i++) {
             if (i == this.photoIds.length) break;
-            photosDiv.appendChild(this.photos[this.photoIds[i]].returnDiv());
+            photosHTML += this.photos[this.photoIds[i]].returnDiv().outerHTML + "\n";
         }
-        photosDiv.id = "photos-page";
-        return photosDiv;
+        return photosHTML;
     }
 
     // go to the next page of photos
@@ -545,7 +544,7 @@ async function displayChild() {
     document.querySelector("#inat-photos-text").innerHTML = "";
     iNatPhotosDiv.innerHTML = "";
     document.querySelector("#inat-photos-text").appendChild(para);
-    iNatPhotosDiv.appendChild(curChild.makePhotos());
+    iNatPhotosDiv.innerHTML = curChild.makePhotos();
 
     // enables/disables the buttons for navigating between children as necessarry 
     
@@ -798,8 +797,8 @@ prevChildButton.addEventListener('click', function() {
 
 nextPhotosButton.addEventListener('click', async function() {
 
-    iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
-    iNatPhotosDiv.appendChild(leaves.getByIndex(curLeafNum).nextPhotos());
+    iNatPhotosDiv.innerHTML = "";
+    iNatPhotosDiv.innerHTML = leaves.getByIndex(curLeafNum).nextPhotos();
     await leaves.getByIndex(curLeafNum).preloadPhotos()
     if (!leaves.getByIndex(curLeafNum).onLastPage()) {
         nextPhotosButton.disabled = false;
@@ -807,8 +806,8 @@ nextPhotosButton.addEventListener('click', async function() {
 });
 
 prevPhotosButton.addEventListener('click', async function() {
-    iNatPhotosDiv.removeChild(document.querySelector("#photos-page"));
-    iNatPhotosDiv.appendChild(leaves.getByIndex(curLeafNum).prevPhotos());
+    iNatPhotosDiv.innerHTML = "";
+    iNatPhotosDiv.innerHTML = leaves.getByIndex(curLeafNum).prevPhotos();
 });
 
 document.querySelector('#inat-photos-container').addEventListener('click', function(event) {
