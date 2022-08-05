@@ -128,15 +128,15 @@ class iNaturalistObjects {
 class Photo {
     constructor(url) {
         this.url = url;
-        this.borderColour = "gray";
+        this.qualityType = "thumbnail-default";
     }
 
     returnDiv() {
         let image = document.createElement('img');
         image.src = this.url;
-        image.style = "border:4px solid " + this.borderColour + "; border-radius:15px;";
+        image.classList.add("thumbnail", this.qualityType);
         let button = document.createElement('button');
-        button.style = "margin:4px; padding:4px;";
+        button.setAttribute("class", "button-thumbnail");
         button.value = this.buttonValue;
         button.appendChild(image); 
         return button;
@@ -166,13 +166,13 @@ class iNatPhoto extends Photo {
 
         switch (this.qualityGrade) {
             case "research": 
-                this.borderColour = "green";
+                this.qualityType = "thumbnail-research";
                 break;
             case "needs_id":
-                this.borderColour = "yellow";
+                this.qualityType = "thumbnail-needs-id";
                 break;
             case "casual":
-                this.borderColour = "red";
+                this.qualityType = "thumbnail-casual";
                 break;
         }
 
@@ -208,7 +208,7 @@ class CommonsPhoto extends Photo {
         super("https://commons.wikimedia.org/w/thumb.php?f=" + commonsPage + "&w=75");
         //("https://commons.wikimedia.org/wiki/File:" + commonsPage)
         this.commonsPage = commonsPage;
-        this.id = commonsPage; //user for "inaturalistObjects" class;
+        this.id = commonsPage; //used for "inaturalistObjects" class;
         this.buttonValue = commonsPage;
         this.dataRetrieved = false;
     }
@@ -355,7 +355,7 @@ class PhotoiNatTaxon extends iNatTaxon {
         this.commonsPhotos = new iNaturalistObjects;
 
         this.iNatDisplayHelper = new ThumbnailsSection(this.preloadPhotos.bind(this));
-
+        this.commonsDisplayHelper = new ThumbnailsSection() //no preload function yet
     }
 
     // loads all the observations and photos from a single api call
@@ -414,6 +414,7 @@ class PhotoiNatTaxon extends iNatTaxon {
             this.wikidataId = false;
             this.commonsURL = false;
             this.wikiURL = false;
+            this.commonsDisplayHelper.updateUpperText("no Wikidata connection found");
             /* TODO
             let searchResults = await getJSON("https://www.wikidata.org/w/api.php?action=query&list=search&format=json&origin=*&srsearch=" + encodeURIComponent(this.latinName));
             searchResults = searchResults.query.search;
@@ -428,6 +429,7 @@ class PhotoiNatTaxon extends iNatTaxon {
 
             if (commonsResults.results.bindings.length === 0) {
                 this.commonsURL = false;
+                this.commonsDisplayHelper.updateUpperText("no Commons page associated with the connected Wikidata item");
             } else {
                 this.commonsURL = commonsResults.results.bindings[0].article.value;
                 if ( this.commonsURL.indexOf("Category") == -1) {
@@ -435,8 +437,19 @@ class PhotoiNatTaxon extends iNatTaxon {
                 }
                 this.commonsPage = this.commonsURL.replace("https://commons.wikimedia.org/wiki/", "");
                 this.commonsPhotoData = await getJSON("https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&format=json&origin=*&cmtype=file&cmtitle=" + this.commonsPage);
-            }
-            
+                this.commonsDisplayHelper.updateUpperText("<a href = " + this.commonsURL + ">Commons Page</a>");
+                if (this.commonsPhotoData?.query?.categorymembers.length > 0) {
+                    let curPhotos = "";
+                    for (let photo of this.commonsPhotoData.query.categorymembers) {
+                        let curPhoto = new CommonsPhoto(photo.title);
+                        if (curPhoto.isPhoto()) {
+                            this.commonsPhotos.add(curPhoto);
+                            curPhotos += curPhoto.returnDiv().outerHTML + "\n";
+                        }
+                    }
+                    this.commonsDisplayHelper.addPage(curPhotos);
+                }
+            }            
 
             if (wikiResults.results.bindings.length === 0) {
                 this.wikiURL = false;
@@ -444,6 +457,8 @@ class PhotoiNatTaxon extends iNatTaxon {
                 this.wikiURL = wikiResults.results.bindings[0].article.value;
                 this.wikiPage = this.wikiURL.replace("https://en.wikipedia.org/wiki/", "");
             }
+
+
             
         }
         this.wikidataLoaded = true;
@@ -511,9 +526,9 @@ class PhotoiNatTaxon extends iNatTaxon {
 
     display() {
         document.querySelector("#inat-results").innerHTML = "";
+        document.querySelector("#wiki-results").innerHTML = "";
         document.querySelector("#inat-results").appendChild(this.iNatDisplayHelper.parentDiv);
-
-        /* WIKIDATA/COMMONS content */
+        document.querySelector("#wiki-results").appendChild(this.commonsDisplayHelper.parentDiv);
     }
 }
 
@@ -548,7 +563,7 @@ async function displayChild() {
 
     let wikidataLoaded = curChild.loadWikidata();
 
-    curChild.display()
+    
 
     // enables/disables the buttons for navigating between children as necessarry 
     
@@ -587,9 +602,9 @@ async function displayChild() {
     document.querySelector("#inat-photos-container").hidden = false;
     */
 
-
-    document.querySelector("#commons-photos").innerHTML = "";
     await wikidataLoaded;
+
+    /*
     if (!curChild.wikidataId) {
         document.querySelector("#wikidata-id").innerHTML = "no Wikidata connection found";
         document.querySelector("#commons-url").innerHTML = "";
@@ -630,6 +645,8 @@ async function displayChild() {
         }
     }
     document.querySelector("#wikidata").hidden = false;
+    */
+    curChild.display()
 }
 
 // creatse the html for the autocomplete results
@@ -857,6 +874,7 @@ document.querySelector('#inat-photos-container').addEventListener('click', funct
 });
 */
 
+/*
 document.querySelector('#commons-photos').addEventListener('click', async function(event) {
     let curPhotoName;
     if (event.target.nodeName == 'BUTTON') {
@@ -894,6 +912,7 @@ document.querySelector('#commons-photos').addEventListener('click', async functi
 
     photoModal.style.display = "block";
 });
+*/
 
 document.querySelector('#close-photo-modal').addEventListener('click', function(event) {
     photoModal.style.display = "none";

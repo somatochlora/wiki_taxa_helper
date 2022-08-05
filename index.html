@@ -11,7 +11,7 @@
                 <label for = "iNatTaxonID">What taxon do you want to look up?</label>
                 <input type = "text" placeholder = "taxon name" id = "iNatTaxonID">
             </div>
-            <div id = leaf-rank-selector>
+            <div id = leaf-rank-selector class = "nav-buttons-div">
                 <select name = "leaf-rank-dropdown" id = "leaf-rank-dropdown" hidden></select>
             </div>      
             <div id = "autocomplete-results">
@@ -21,19 +21,12 @@
         </section>
         <section id = leaf-navigation>
             <div id = leaf-nav-buttons class = bidir-buttons-container>
-                <button type = "button" id = "prev-child" class = "bidir-button" hidden disabled>previous taxon</button>
-                <button type = "button" id = "next-child" class = "bidir-button" hidden disabled>next taxon</button>
+                <button type = "button" id = "prev-child" class = "nav-button" hidden disabled>previous taxon</button>
+                <button type = "button" id = "next-child" class = "nav-button" hidden disabled>next taxon</button>
             </div>
         </section>
         <section id = inat-results></section>
-        <section id = wiki-results>
-            <div id = "wikidata" hidden>
-                <p id = "wikidata-id"></p>
-                <p id = "commons-url"></p>
-                <div id = "commons-photos" class = "thumbnails-container"></div>
-                <p id = "wikipedia-url"></p>
-            </div>
-        </section>
+        <section id = wiki-results></section>
 
         <section id = "photo-modal" class = "modal">
             <div class="modal-frame">
