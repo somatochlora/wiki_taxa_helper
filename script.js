@@ -128,8 +128,7 @@ class ThumbnailsSection {
             
                 photoModal.style.display = "block";
             });
-        }
-        
+        }       
 
         this.pages = []
         this.curPage = -1;
@@ -436,7 +435,7 @@ class PhotoiNatTaxon extends iNatTaxon {
         this.commonsPhotos = new iNaturalistObjects;
 
         this.iNatDisplayHelper = new ThumbnailsSection(this.preloadPhotos.bind(this), "inat");
-        this.commonsDisplayHelper = new ThumbnailsSection(() => {}, "commons") //no preload function yet
+        this.commonsDisplayHelper = new ThumbnailsSection(this.loadNextCommonsPhotos.bind(this), "commons");
     }
 
     // loads all the observations and photos from a single api call
@@ -517,11 +516,12 @@ class PhotoiNatTaxon extends iNatTaxon {
                     this.commonsURL = this.commonsURL.replace("wiki/", "wiki/Category:");
                 }
                 this.commonsPage = this.commonsURL.replace("https://commons.wikimedia.org/wiki/", "");
-                this.commonsPhotoData = await getJSON("https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&format=json&origin=*&cmtype=file&cmtitle=" + this.commonsPage);
+                let commonsPhotoData = await getJSON("https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&format=json&origin=*&cmtype=file&cmlimit=" + PHOTODISPLAYNUM + "&cmtitle=" + this.commonsPage);
                 this.commonsDisplayHelper.updateUpperText("<a href = " + this.commonsURL + ">Commons Page</a>");
-                if (this.commonsPhotoData?.query?.categorymembers.length > 0) {
+                this.commonsContinue = commonsPhotoData?.continue?.cmcontinue;
+                if (commonsPhotoData?.query?.categorymembers.length > 0) {
                     let curPhotos = "";
-                    for (let photo of this.commonsPhotoData.query.categorymembers) {
+                    for (let photo of commonsPhotoData.query.categorymembers) {
                         let curPhoto = new CommonsPhoto(photo.title);
                         if (curPhoto.isPhoto()) {
                             this.commonsPhotos.add(curPhoto);
@@ -537,15 +537,31 @@ class PhotoiNatTaxon extends iNatTaxon {
             } else {
                 this.wikiURL = wikiResults.results.bindings[0].article.value;
                 this.wikiPage = this.wikiURL.replace("https://en.wikipedia.org/wiki/", "");
-            }
-
-
-            
+            }            
         }
         this.wikidataLoaded = true;
         
     }
     
+    async loadNextCommonsPhotos () {
+        let commonsPhotoData = await getJSON("https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&format=json&origin=*&cmtype=file&cmlimit=" + PHOTODISPLAYNUM + "&cmtitle=" + this.commonsPage + "&cmcontinue=" + this.commonsContinue);
+        console.log("pre commons continue - " + this.commonsContinue)
+        this.commonsContinue = commonsPhotoData?.continue?.cmcontinue;
+        console.log("post commons continue - " + this.commonsContinue)
+        if (commonsPhotoData?.query?.categorymembers.length > 0) {
+            console.log("inside if");
+            let curPhotos = "";
+            for (let photo of commonsPhotoData.query.categorymembers) {
+                let curPhoto = new CommonsPhoto(photo.title);
+                if (curPhoto.isPhoto()) {
+                    this.commonsPhotos.add(curPhoto);
+                    curPhotos += curPhoto.returnDiv().outerHTML + "\n";
+                }
+            }
+            this.commonsDisplayHelper.addPage(curPhotos);
+        }
+    }
+
     // load the first set of photos
     async loadPhotos () {
         this.addObservations(await this.getLicensedPhotos());
@@ -684,6 +700,7 @@ async function displayChild() {
     */
 
     await wikidataLoaded;
+    curChild.loadNextCommonsPhotos();
 
     /*
     if (!curChild.wikidataId) {
