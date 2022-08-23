@@ -10,6 +10,15 @@ async function getJSON(url) {
     return data; // returns a promise, which resolves to this data value
 }
 
+async function getText(url) {
+    const response = await fetch(url);
+    if (!response.ok) // check if response worked (no 404 errors etc...)
+        throw new Error(response.statusText);
+
+    const data = response.text(); // get text from the response
+    return data; // returns a promise, which resolves to this data value
+}
+
 class ThumbnailsSection {
     constructor(preLoadFunc = () => {}, typeOfPhotos) {
         this.parentDiv = document.createElement("div")
@@ -537,10 +546,16 @@ class PhotoiNatTaxon extends iNatTaxon {
             } else {
                 this.wikiURL = wikiResults.results.bindings[0].article.value;
                 this.wikiPage = this.wikiURL.replace("https://en.wikipedia.org/wiki/", "");
+                this.wikipediaHTML = this.loadWikipediaPage();
             }            
         }
         this.wikidataLoaded = true;
         
+    }
+
+    async loadWikipediaPage () {
+        let wikiPageData = await getText("https://en.wikipedia.org/api/rest_v1/page/html/" + this.wikiPage);
+        return wikiPageData;
     }
     
     async loadNextCommonsPhotos () {
@@ -621,11 +636,16 @@ class PhotoiNatTaxon extends iNatTaxon {
         return false;
     }
 
-    display() {
+    async display() {
         document.querySelector("#inat-results").innerHTML = "";
         document.querySelector("#wiki-results").innerHTML = "";
         document.querySelector("#inat-results").appendChild(this.iNatDisplayHelper.parentDiv);
         document.querySelector("#wiki-results").appendChild(this.commonsDisplayHelper.parentDiv);
+        if (this.wikiURL) {            
+            document.querySelector("#wikipedia-page").innerHTML = await this.wikipediaHTML;
+        } else {
+            document.querySelector("#wikipedia-page").innerHTML = "";
+        }
     }
 }
 
